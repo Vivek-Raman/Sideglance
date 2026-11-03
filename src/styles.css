@@ -147,7 +147,10 @@ main::after {
   user-select: text;
 }
 .document h2 {
-  margin: 0 0 0.83em;
+  margin: 0 0 0.15em;
+}
+.document p {
+  margin: 0 0 0.2em;
 }
 .document ul {
   margin: 0;

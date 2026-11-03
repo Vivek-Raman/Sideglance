@@ -343,13 +343,37 @@
     --ease-gentle-out: cubic-bezier(0.22, 1, 0.36, 1);
   }
   .document {
+    --bottom-text-fade: clamp(64px, 20vh, 124px);
     overflow-anchor: none;
+    padding-bottom: calc(var(--bottom-text-fade) + 24px);
+    /* Fade the scrolling content so the background artwork stays crisp beneath it. */
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      black calc(100% - var(--bottom-text-fade)),
+      rgb(0 0 0 / 75%) calc(100% - var(--bottom-text-fade) * 0.55),
+      rgb(0 0 0 / 25%) calc(100% - var(--bottom-text-fade) * 0.2),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      black calc(100% - var(--bottom-text-fade)),
+      rgb(0 0 0 / 75%) calc(100% - var(--bottom-text-fade) * 0.55),
+      rgb(0 0 0 / 25%) calc(100% - var(--bottom-text-fade) * 0.2),
+      transparent 100%
+    );
   }
   .motion-row {
     display: flow-root;
   }
   .motion-row h2 {
-    margin: 0 0 0.83em;
+    margin: 0 0 0.15em;
+  }
+  .motion-row + .motion-row h2 {
+    margin-top: 0.6em;
+  }
+  .motion-row p {
+    margin: 0 0 0.2em;
+    color: var(--muted);
   }
   .motion-row ul {
     margin-bottom: 0;
