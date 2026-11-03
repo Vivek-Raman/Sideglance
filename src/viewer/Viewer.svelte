@@ -34,6 +34,12 @@
       return null;
     }
   }
+  function linkLabel(link: string) {
+    const url = new URL(link);
+    const pullRequest =
+      url.hostname === 'github.com' && url.pathname.match(/^\/[^/]+\/[^/]+\/pull\/(\d+)\/?$/);
+    return pullRequest ? `PR #${pullRequest[1]}` : 'View link';
+  }
   function expirySoon(
     submittedAt: string,
     autoClearAfterMinutes: number | null,
@@ -291,6 +297,7 @@
             <p>{row.branch}</p>
           {:else}
             {@const { entry, point, pointIndex } = row}
+            {@const link = safeLink(point.link)}
             <ul class:branch-end={row.last}>
               <li
                 class="status-point"
@@ -302,11 +309,12 @@
                 )}
               >
                 <span class="point-text"
-                  >{#if point.done}<strong>DONE</strong>: {' '}{/if}{#if safeLink(point.link)}<a
-                      href={safeLink(point.link)}
+                  >{#if point.done}<strong>DONE</strong>: {' '}{/if}{point.text}{#if link}{' '}<a
+                      href={link}
                       target="_blank"
-                      rel="noopener noreferrer">{point.text}</a
-                    >{:else}{point.text}{/if}</span
+                      title={link}
+                      rel="noopener noreferrer">{linkLabel(link)}</a
+                    >{/if}</span
                 >
                 <span class="point-actions">
                   <span class="point-age"
