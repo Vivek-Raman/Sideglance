@@ -1,5 +1,5 @@
 use serde_json::{json, Map, Value};
-use std::{fs, path::Path, process::Command, str::FromStr};
+use std::{fs, io::Write, path::Path, process::Command, str::FromStr};
 use toml_edit::{value, Array, DocumentMut};
 
 use crate::SKILL_NAME;
@@ -51,11 +51,7 @@ pub(crate) fn register_codex_mcp_at(path: &Path, executable: &Path) -> Result<()
 }
 
 fn save_toml_config(path: &Path, document: &DocumentMut) -> Result<(), String> {
-    let temporary = path.with_extension("toml.tmp");
-    fs::write(&temporary, document.to_string())
-        .map_err(|error| format!("Unable to write {}: {error}", path.display()))?;
-    fs::rename(&temporary, path)
-        .map_err(|error| format!("Unable to save {}: {error}", path.display()))
+    save_config(path, document.to_string().as_bytes())
 }
 
 pub(crate) fn register_codex_mcp(path: &Path, executable: &Path) -> Result<(), String> {
@@ -131,16 +127,45 @@ fn existing_nested_object_mut<'a>(
 }
 
 fn save_json_config(path: &Path, value: &Value) -> Result<(), String> {
+    let contents = serde_json::to_vec_pretty(value)
+        .map_err(|error| format!("Unable to encode {}: {error}", path.display()))?;
+    save_config(path, &contents)
+}
+
+fn save_config(path: &Path, contents: &[u8]) -> Result<(), String> {
     let directory = path.parent().ok_or("Configuration directory unavailable")?;
     fs::create_dir_all(directory)
         .map_err(|error| format!("Unable to create {}: {error}", directory.display()))?;
-    let temporary = path.with_extension("json.tmp");
-    let contents = serde_json::to_vec_pretty(value)
-        .map_err(|error| format!("Unable to encode {}: {error}", path.display()))?;
-    fs::write(&temporary, contents)
+    let permissions = match fs::metadata(path) {
+        Ok(metadata) => Some(metadata.permissions()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("Unable to inspect {}: {error}", path.display())),
+    };
+    // New files are private, and the temporary file stays private while writing.
+    let mut temporary = tempfile::NamedTempFile::new_in(directory)
+        .map_err(|error| format!("Unable to create temporary config: {error}"))?;
+    temporary
+        .write_all(contents)
         .map_err(|error| format!("Unable to write {}: {error}", path.display()))?;
-    fs::rename(&temporary, path)
-        .map_err(|error| format!("Unable to save {}: {error}", path.display()))
+    if let Some(permissions) = permissions {
+        temporary
+            .as_file()
+            .set_permissions(permissions)
+            .map_err(|error| {
+                format!(
+                    "Unable to preserve permissions for {}: {error}",
+                    path.display()
+                )
+            })?;
+    }
+    temporary
+        .as_file()
+        .sync_all()
+        .map_err(|error| format!("Unable to sync {}: {error}", path.display()))?;
+    temporary
+        .persist(path)
+        .map_err(|error| format!("Unable to save {}: {error}", path.display()))?;
+    Ok(())
 }
 
 pub(crate) fn register_standard_json_mcp(path: &Path, executable: &Path) -> Result<(), String> {
@@ -242,6 +267,79 @@ pub(crate) fn uninstall_claude_mcp() -> Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn mcp_changes_preserve_existing_config_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let executable = Path::new("/Applications/ctx-ppteer");
+        for mode in [0o600, 0o640] {
+            let toml = directory.path().join("config.toml");
+            fs::write(&toml, "# existing configuration\n").unwrap();
+            fs::set_permissions(&toml, fs::Permissions::from_mode(mode)).unwrap();
+            register_codex_mcp_at(&toml, executable).unwrap();
+            assert_eq!(
+                fs::metadata(&toml).unwrap().permissions().mode() & 0o777,
+                mode
+            );
+            unregister_codex_mcp_at(&toml).unwrap();
+            assert_eq!(
+                fs::metadata(&toml).unwrap().permissions().mode() & 0o777,
+                mode
+            );
+
+            for opencode in [false, true] {
+                let json = directory.path().join("config.json");
+                fs::write(&json, "{}").unwrap();
+                fs::set_permissions(&json, fs::Permissions::from_mode(mode)).unwrap();
+                let keys: &[&str] = if opencode {
+                    register_opencode_mcp(&json, executable).unwrap();
+                    &["mcp", "servers"]
+                } else {
+                    register_standard_json_mcp(&json, executable).unwrap();
+                    &["mcpServers"]
+                };
+                assert_eq!(
+                    fs::metadata(&json).unwrap().permissions().mode() & 0o777,
+                    mode
+                );
+                unregister_json_mcp(&json, keys).unwrap();
+                assert_eq!(
+                    fs::metadata(&json).unwrap().permissions().mode() & 0o777,
+                    mode
+                );
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_mcp_configs_are_private_and_ignore_predictable_temp_paths() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let directory = tempfile::tempdir().unwrap();
+        let sentinel = directory.path().join("sentinel");
+        fs::write(&sentinel, "untouched").unwrap();
+        let executable = Path::new("/Applications/ctx-ppteer");
+        let toml = directory.path().join("config.toml");
+        let json = directory.path().join("config.json");
+        for extension in ["toml.tmp", "json.tmp"] {
+            symlink(
+                &sentinel,
+                directory.path().join(format!("config.{extension}")),
+            )
+            .unwrap();
+        }
+        register_codex_mcp_at(&toml, executable).unwrap();
+        register_standard_json_mcp(&json, executable).unwrap();
+        for path in [&toml, &json] {
+            assert_eq!(
+                fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+        assert_eq!(fs::read_to_string(sentinel).unwrap(), "untouched");
+    }
 
     #[test]
     fn recognizes_missing_codex_mcp_servers_table() {

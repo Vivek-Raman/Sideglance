@@ -41,13 +41,12 @@ pub struct StatusStore {
     path: PathBuf,
 }
 struct SidecarLock {
-    path: PathBuf,
     file: File,
 }
 impl Drop for SidecarLock {
     fn drop(&mut self) {
         let _ = self.file.unlock();
-        let _ = fs::remove_file(&self.path);
+        // Keep the inode stable for writers that already opened the sidecar.
     }
 }
 impl StatusStore {
@@ -69,7 +68,7 @@ impl StatusStore {
             .open(&path)?;
         loop {
             match file.try_lock_exclusive() {
-                Ok(()) => return Ok(SidecarLock { path, file }),
+                Ok(()) => return Ok(SidecarLock { file }),
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                     thread::sleep(Duration::from_millis(2))
                 }
@@ -341,7 +340,39 @@ mod tests {
             .unwrap();
 
         assert_eq!(StatusStore::new(path).read().unwrap().entries.len(), 1);
-        assert!(!dir.path().join("status.lock").exists());
+        assert!(dir.path().join("status.lock").exists());
+    }
+
+    #[test]
+    fn waiting_and_new_writers_share_the_same_lock_after_release() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = StatusStore::new(dir.path().join("status.json"));
+        let first = store.lock().unwrap();
+        let path = dir.path().join("status.lock");
+        // A waiting writer opens the inode before the current owner releases it.
+        let waiting = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        assert_eq!(
+            waiting.try_lock_exclusive().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        drop(first);
+        waiting.try_lock_exclusive().unwrap();
+        let newcomer = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        assert_eq!(
+            newcomer.try_lock_exclusive().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        FileExt::unlock(&waiting).unwrap();
+        newcomer.try_lock_exclusive().unwrap();
     }
 
     #[test]
