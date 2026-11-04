@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { pointKey, projectNames, relativeTime, viewerRows } from './rows';
+  import { countExpiryKeys, pointKey, projectNames, relativeTime, viewerRows } from './rows';
   import { onMount, tick } from 'svelte';
   import { command } from '../shared/commands';
   import { applyPrimaryColor, applyTheme, systemTheme } from '../shared/theme';
@@ -24,7 +24,8 @@
   let statusError = controller.state.statusError;
   let appearanceKey = '';
   $: projects = projectNames(entries, settings?.projectSortOrder ?? 'project-directory-asc');
-  $: rows = viewerRows(entries, projects);
+  $: rows = viewerRows(entries, projects, settings?.statusSortOrder);
+  $: countExpiring = countExpiryKeys(entries, settings?.maxStatusItemsPerProject ?? null);
   function safeLink(link: string | null) {
     if (!link) return null;
     try {
@@ -302,11 +303,12 @@
               <li
                 class="status-point"
                 class:removing={pendingRemoval.has(row.key)}
-                class:expiring-soon={expirySoon(
-                  point.submitted_at ?? entry.updated_at,
-                  settings?.autoClearAfterMinutes ?? null,
-                  now,
-                )}
+                class:expiring-soon={countExpiring.has(row.key) ||
+                  expirySoon(
+                    point.submitted_at ?? entry.updated_at,
+                    settings?.autoClearAfterMinutes ?? null,
+                    now,
+                  )}
               >
                 <span class="point-text"
                   >{#if point.done}<strong>DONE</strong>: {' '}{/if}{point.text}{#if link}{' '}<a
@@ -476,9 +478,9 @@
     opacity: 0;
     pointer-events: none;
     color: var(--muted);
-    background: color-mix(in srgb, var(--bg) 72%, transparent);
-    backdrop-filter: blur(10px) saturate(1.15);
-    -webkit-backdrop-filter: blur(10px) saturate(1.15);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(28px) saturate(1.15);
+    -webkit-backdrop-filter: blur(28px) saturate(1.15);
     box-shadow:
       0 2px 8px color-mix(in srgb, var(--text) 8%, transparent),
       inset 0 0 0 1px color-mix(in srgb, var(--bg) 28%, transparent);

@@ -275,6 +275,7 @@ export class ViewerController {
               settings &&
               this.state.settings &&
               (settings.projectSortOrder !== this.state.settings.projectSortOrder ||
+                settings.statusSortOrder !== this.state.settings.statusSortOrder ||
                 settings.textScale !== this.state.settings.textScale);
             this.commitPending();
             if (snapshot || layoutChanged)

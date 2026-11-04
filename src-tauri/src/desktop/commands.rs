@@ -96,24 +96,42 @@ pub(crate) fn set_project_sort_order(
 }
 
 #[tauri::command]
+pub(crate) fn set_status_sort_order(
+    status_sort_order: String,
+    owner: State<'_, Arc<SettingsOwner>>,
+) -> Result<(), String> {
+    owner.set_status_sort_order(&status_sort_order)?;
+    Ok(())
+}
+
+#[tauri::command]
 pub(crate) fn set_auto_clear_after_minutes(
     auto_clear_after_minutes: Option<u64>,
     app: AppHandle,
     owner: State<'_, Arc<SettingsOwner>>,
     state: State<'_, Arc<ViewerState>>,
 ) -> Result<(), String> {
-    let settings = owner.set_retention(auto_clear_after_minutes)?;
-    if let Some(minutes) = settings.auto_clear_after_minutes {
-        if let Err(error) = state
-            .store
-            .prune(std::time::Duration::from_secs(minutes.saturating_mul(60)))
-        {
-            return Err(format!(
-                "Auto-clear setting saved, but pruning failed: {error}"
-            ));
-        }
-        update(&app, &state);
-    }
+    owner.set_retention(auto_clear_after_minutes)?;
+    crate::status::retention::clear_expired_points(&state, &owner)
+        .map_err(|error| format!("Auto-clear setting saved, but pruning failed: {error}"))?;
+    update(&app, &state);
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) fn set_max_status_items_per_project(
+    max_status_items_per_project: Option<usize>,
+    app: AppHandle,
+    owner: State<'_, Arc<SettingsOwner>>,
+    state: State<'_, Arc<ViewerState>>,
+) -> Result<(), String> {
+    owner.update(|settings| {
+        settings.max_status_items_per_project = max_status_items_per_project;
+        Ok(())
+    })?;
+    crate::status::retention::clear_expired_points(&state, &owner)
+        .map_err(|error| format!("Count setting saved, but pruning failed: {error}"))?;
+    update(&app, &state);
     Ok(())
 }
 

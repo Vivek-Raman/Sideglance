@@ -1,6 +1,8 @@
 export type Theme = 'system' | 'light' | 'dark';
 export type ProjectSortOrder = 'project-directory-asc' | 'updated-at-desc' | 'updated-at-asc';
 
+export type StatusSortOrder = 'submitted-at-desc' | 'submitted-at-asc';
+
 export type StatusPoint = {
   text: string;
   done: boolean;
@@ -58,5 +60,7 @@ export type Settings = {
   textScale: number;
   pinned: boolean;
   projectSortOrder: ProjectSortOrder;
+  statusSortOrder: StatusSortOrder;
   autoClearAfterMinutes: number | null;
+  maxStatusItemsPerProject: number | null;
 };

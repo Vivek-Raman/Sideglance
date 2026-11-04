@@ -14,11 +14,12 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src tests package.json status.schema.json README.md svelte.config.js vite.config.ts tsconfig.json playwright.config.ts .prettierrc",
     "format:check": "prettier --check src tests package.json status.schema.json README.md svelte.config.js vite.config.ts tsconfig.json playwright.config.ts .prettierrc",
+    "test:rows": "node --experimental-strip-types --test tests/viewer-rows.test.ts",
     "test:controller": "node --experimental-strip-types --test tests/viewer-controller.test.ts",
     "test:lifecycle": "node --experimental-strip-types --test tests/settings-lifecycle.test.ts",
     "test:retention": "node --experimental-strip-types --test tests/settings-retention.test.ts",
     "test:motion": "playwright test tests/viewer-motion.spec.ts",
-    "test": "npm run test:controller && npm run test:lifecycle && npm run test:retention && npm run check && npm run typecheck && npm run build"
+    "test": "npm run test:rows && npm run test:controller && npm run test:lifecycle && npm run test:retention && npm run check && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",

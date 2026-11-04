@@ -9,7 +9,9 @@ const settings: Settings = {
   textScale: 1,
   pinned: true,
   projectSortOrder: 'project-directory-asc',
+  statusSortOrder: 'submitted-at-desc',
   autoClearAfterMinutes: null,
+  maxStatusItemsPerProject: null,
 };
 const entry: StatusEntry = {
   folder_name: 'demo',

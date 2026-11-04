@@ -75,8 +75,20 @@ pub fn start(app: AppHandle, state: Arc<ViewerState>, owner: Arc<SettingsOwner>)
                 }
             }
             match rx.recv_timeout(Duration::from_millis(250)) {
-                Ok(Ok(_event)) => {
+                Ok(Ok(event)) => {
+                    if !event.paths.iter().any(|path| path == &state.path) {
+                        continue;
+                    }
                     thread::sleep(Duration::from_millis(120));
+                    if let Err(error) = clear_expired_points(&state, &owner) {
+                        publish_retention_error(
+                            &app,
+                            &state,
+                            format!("Unable to prune status points: {error}"),
+                        );
+                    } else {
+                        retention_recovered(&app, &state);
+                    }
                     update(&app, &state);
                 }
                 Ok(Err(error)) => {

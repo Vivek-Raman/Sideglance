@@ -30,6 +30,25 @@ pub enum ProjectSortOrder {
     UpdatedAtAsc,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
+pub enum StatusSortOrder {
+    #[default]
+    #[serde(rename = "submitted-at-desc")]
+    SubmittedAtDesc,
+    #[serde(rename = "submitted-at-asc")]
+    SubmittedAtAsc,
+}
+
+impl StatusSortOrder {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "submitted-at-desc" => Ok(Self::SubmittedAtDesc),
+            "submitted-at-asc" => Ok(Self::SubmittedAtAsc),
+            _ => Err("Status sort order must be submitted-at-desc or submitted-at-asc".into()),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -44,7 +63,11 @@ pub struct Settings {
     #[serde(default = "default_project_sort_order")]
     pub project_sort_order: ProjectSortOrder,
     #[serde(default)]
+    pub status_sort_order: StatusSortOrder,
+    #[serde(default)]
     pub auto_clear_after_minutes: Option<u64>,
+    #[serde(default)]
+    pub max_status_items_per_project: Option<usize>,
 }
 
 fn default_theme() -> Theme {
@@ -71,7 +94,9 @@ impl Default for Settings {
             text_scale: default_text_scale(),
             pinned: default_pinned(),
             project_sort_order: default_project_sort_order(),
+            status_sort_order: StatusSortOrder::default(),
             auto_clear_after_minutes: None,
+            max_status_items_per_project: None,
         }
     }
 }
@@ -94,6 +119,9 @@ impl ProjectSortOrder {
 }
 
 fn validate(settings: &Settings) -> Result<(), String> {
+    if settings.max_status_items_per_project == Some(0) {
+        return Err("Maximum status items must be at least 1".into());
+    }
     if !(0.85..=1.35).contains(&settings.text_scale) {
         return Err("Text scale must be between 0.85 and 1.35".into());
     }
@@ -275,6 +303,13 @@ impl SettingsOwner {
             Ok(())
         })
     }
+    pub fn set_status_sort_order(&self, value: &str) -> Result<Settings, String> {
+        let value = StatusSortOrder::parse(value)?;
+        self.update(|settings| {
+            settings.status_sort_order = value;
+            Ok(())
+        })
+    }
     pub fn set_retention(&self, value: Option<u64>) -> Result<Settings, String> {
         if value.is_some_and(|minutes| !(1..=43_200).contains(&minutes)) {
             return Err("Auto-clear must be between 1 minute and 30 days".into());
@@ -293,6 +328,17 @@ pub fn settings_owner(app: &AppHandle) -> Result<Arc<SettingsOwner>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn status_sort_defaults_and_round_trips() {
+        let settings: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(settings.status_sort_order, StatusSortOrder::SubmittedAtDesc);
+        let mut settings = settings;
+        settings.status_sort_order = StatusSortOrder::parse("submitted-at-asc").unwrap();
+        let json = serde_json::to_string(&settings).unwrap();
+        assert!(json.contains("\"statusSortOrder\":\"submitted-at-asc\""));
+        assert_eq!(serde_json::from_str::<Settings>(&json).unwrap(), settings);
+        assert!(StatusSortOrder::parse("unknown").is_err());
+    }
     #[test]
     fn ignores_removed_window_preferences() {
         let settings: Settings = serde_json::from_str(r#"{"sourcePath":"/tmp/status.md","window":{"monitor_name":"Display","relative_x":0.25,"relative_y":0.5}}"#).unwrap();

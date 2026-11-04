@@ -55,6 +55,7 @@ export class RowMotion implements ViewerMotion {
       viewerRows(
         layout.entries,
         projectNames(layout.entries, layout.settings?.projectSortOrder ?? 'project-directory-asc'),
+        layout.settings?.statusSortOrder,
       ).map(({ key }) => key),
     );
     const exits: Promise<void>[] = [];

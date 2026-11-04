@@ -1,4 +1,4 @@
-import type { StatusEntry, StatusPoint } from '../shared/types';
+import type { StatusEntry, StatusPoint, StatusSortOrder } from '../shared/types';
 
 type Row =
   | { key: string; kind: 'project'; folder: string }
@@ -39,7 +39,11 @@ export function pointKey(entry: StatusEntry, point: StatusPoint, pointIndex: num
 
 // All moving rows must be siblings. Animating both a group and its children
 // applies the same viewport displacement more than once.
-export function viewerRows(entries: StatusEntry[], projects: string[]): Row[] {
+export function viewerRows(
+  entries: StatusEntry[],
+  projects: string[],
+  order: StatusSortOrder = 'submitted-at-desc',
+): Row[] {
   return projects.flatMap((folder) => {
     const projectEntries = entries.filter((entry) => entry.folder_name === folder);
     const rows: Row[] = [{ key: JSON.stringify(['project', folder]), kind: 'project', folder }];
@@ -50,6 +54,11 @@ export function viewerRows(entries: StatusEntry[], projects: string[]): Row[] {
         .flatMap((entry) =>
           entry.points.map((point, pointIndex) => ({ entry, point, pointIndex })),
         );
+      points.sort((left, right) => {
+        const leftTime = Date.parse(left.point.submitted_at ?? left.entry.updated_at);
+        const rightTime = Date.parse(right.point.submitted_at ?? right.entry.updated_at);
+        return order === 'submitted-at-asc' ? leftTime - rightTime : rightTime - leftTime;
+      });
       points.forEach((item, index) =>
         rows.push({
           key: pointKey(item.entry, item.point, item.pointIndex),
@@ -95,4 +104,35 @@ export function relativeTime(value: string, now: number) {
   const days = Math.floor(hours / 24);
   const remainingHours = hours % 24;
   return `${days}d${remainingHours ? ` ${remainingHours}h` : ''}`;
+}
+
+// Match backend retention ordering, including ties and legacy timestamp fallback.
+// At capacity, the oldest item is next to go; also flag any pending overflow.
+export function countExpiryKeys(entries: StatusEntry[], limit: number | null): Set<string> {
+  const keys = new Set<string>();
+  if (limit == null || limit < 1) return keys;
+  const projects = new Map<
+    string,
+    { key: string; time: number; entryIndex: number; pointIndex: number }[]
+  >();
+  entries.forEach((entry, entryIndex) => {
+    const points = projects.get(entry.folder_name) ?? [];
+    entry.points.forEach((point, pointIndex) => {
+      points.push({
+        key: pointKey(entry, point, pointIndex),
+        time: Date.parse(point.submitted_at ?? entry.updated_at),
+        entryIndex,
+        pointIndex,
+      });
+    });
+    projects.set(entry.folder_name, points);
+  });
+  for (const points of projects.values()) {
+    points.sort(
+      (a, b) => a.time - b.time || a.entryIndex - b.entryIndex || a.pointIndex - b.pointIndex,
+    );
+    for (const point of points.slice(0, Math.max(0, points.length - limit + 1)))
+      keys.add(point.key);
+  }
+  return keys;
 }

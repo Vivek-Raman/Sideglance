@@ -184,6 +184,16 @@ impl StatusStore {
         self.save_unlocked(&document)?;
         Ok(true)
     }
+    pub fn apply_retention(&self, rules: &[domain::RetentionRule]) -> Result<bool, StatusError> {
+        let _lock = self.lock()?;
+        let mut document = self.read_unlocked()?;
+        let changed = domain::apply_retention(&mut document, rules, Utc::now())
+            .map_err(StatusError::InvalidInput)?;
+        if changed {
+            self.save_unlocked(&document)?;
+        }
+        Ok(changed)
+    }
     pub fn prune(&self, age: Duration) -> Result<bool, StatusError> {
         let _lock = self.lock()?;
         let mut document = self.read_unlocked()?;

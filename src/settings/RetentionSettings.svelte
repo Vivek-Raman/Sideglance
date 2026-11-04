@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CountRetentionSettings from './CountRetentionSettings.svelte';
   import { command } from '../shared/commands';
   import {
     beginRetentionSave,
@@ -14,6 +15,7 @@
   export let onSaved: (minutes: number | null) => void;
   export let onError: (error: unknown) => void;
   export let onSortChange: () => void;
+  export let onStatusSortChange: () => void;
   export let resetVersion = 0;
   let draft: RetentionDraft = retentionDraft(settings.autoClearAfterMinutes);
   let lastResetVersion = resetVersion;
@@ -65,19 +67,33 @@
     <p>Choose how project updates are organized and retained.</p>
   </div>
   <div class="setting-row">
-    <label for="project-sort-order">Project note order</label><select
+    <label for="project-sort-order">Project order</label><select
       id="project-sort-order"
       bind:value={settings.projectSortOrder}
       onchange={onSortChange}
-      ><option value="updated-at-desc">Newest first</option><option value="updated-at-asc"
-        >Oldest first</option
+      ><option value="updated-at-desc">Most recently updated first</option><option
+        value="updated-at-asc">Least recently updated first</option
       ><option value="project-directory-asc">Project directory A-Z</option></select
     >
+  </div>
+  <div class="setting-row">
+    <label for="status-sort-order">Status order within each branch</label>
+    <select
+      id="status-sort-order"
+      bind:value={settings.statusSortOrder}
+      onchange={onStatusSortChange}
+    >
+      <option value="submitted-at-desc">Most recently submitted first</option>
+      <option value="submitted-at-asc">Least recently submitted first</option>
+    </select>
   </div>
   <div class="auto-clear">
     <div>
       <h3>Auto-clear status items</h3>
-      <p>Remove items after their submitted time. This only runs while ctx-ppteer is open.</p>
+      <p>
+        Select any combination of deletion rules. Items are removed when any selected rule applies.
+        Cleanup only runs while ctx-ppteer is open.
+      </p>
     </div>
     <label class="checkbox"
       ><input
@@ -85,7 +101,7 @@
         checked={draft.enabled}
         disabled={saving || savingRequest}
         onchange={(event) => toggle(event.currentTarget.checked)}
-      /> Clear old items</label
+      /> Time-based deletion</label
     >{#if draft.enabled}<div class="auto-clear-controls">
         <input
           aria-label="Auto-clear age"
@@ -108,6 +124,7 @@
           onclick={() => void save()}
           disabled={saving || savingRequest}>Apply shorter retention</button
         >{/if}{/if}
+    <CountRetentionSettings {settings} {saving} {resetVersion} {onError} />
   </div>
 </section>
 

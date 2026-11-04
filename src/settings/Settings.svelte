@@ -52,6 +52,18 @@
       saving = false;
     }
   }
+  async function saveStatusSortOrder() {
+    if (!settings) return;
+    saving = true;
+    settingsError = '';
+    try {
+      await command('set_status_sort_order', { statusSortOrder: settings.statusSortOrder });
+    } catch (error) {
+      settingsError = errorText(error);
+    } finally {
+      saving = false;
+    }
+  }
   async function savePinnedSetting(pinned: boolean) {
     const editGeneration = settingsGeneration;
     saving = true;
@@ -139,6 +151,7 @@
       }}
       onError={(error) => (settingsError = errorText(error))}
       onSortChange={() => void saveSortOrder()}
+      onStatusSortChange={() => void saveStatusSortOrder()}
     />
     <AgentIntegrations onError={(error) => (integrationsError = errorText(error))} />
     {#if integrationsError}<p class="error">{integrationsError}</p>{/if}

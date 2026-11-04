@@ -310,3 +310,118 @@ pub fn prune(
             .map(|entry| entry.points.len())
             .sum::<usize>())
 }
+
+/// Independent retention rules compose by removing anything rejected by any rule.
+pub enum RetentionRule {
+    Age(std::time::Duration),
+    CountPerProject(usize),
+}
+
+pub fn apply_retention(
+    document: &mut Document,
+    rules: &[RetentionRule],
+    now: DateTime<Utc>,
+) -> Result<bool, String> {
+    let mut changed = false;
+    for rule in rules {
+        match rule {
+            RetentionRule::Age(age) => changed |= prune(document, *age, now)?,
+            RetentionRule::CountPerProject(limit) => {
+                let mut projects = std::collections::HashMap::<String, Vec<_>>::new();
+                for (entry_index, entry) in document.entries.iter().enumerate() {
+                    for (point_index, point) in entry.points.iter().enumerate() {
+                        let at = point.submitted_at.as_deref().unwrap_or(&entry.updated_at);
+                        let at = DateTime::parse_from_rfc3339(at).map_err(|e| e.to_string())?;
+                        projects
+                            .entry(entry.folder_name.clone())
+                            .or_default()
+                            .push((at, entry_index, point_index));
+                    }
+                }
+                let mut removed = HashSet::new();
+                for points in projects.values_mut() {
+                    // Later entries/points win ties, independently of viewer sort order.
+                    points.sort();
+                    for (_, entry, point) in points.iter().take(points.len().saturating_sub(*limit))
+                    {
+                        removed.insert((*entry, *point));
+                    }
+                }
+                changed |= !removed.is_empty();
+                for (entry_index, entry) in document.entries.iter_mut().enumerate() {
+                    let mut index = 0;
+                    entry.points.retain(|_| {
+                        let keep = !removed.contains(&(entry_index, index));
+                        index += 1;
+                        keep
+                    });
+                }
+                document.entries.retain(|entry| !entry.points.is_empty());
+            }
+        }
+    }
+    if changed {
+        document.version = 2;
+    }
+    validate(document)?;
+    Ok(changed)
+}
+
+#[cfg(test)]
+mod retention_tests {
+    use super::*;
+
+    fn fixture() -> Document {
+        serde_json::from_value(serde_json::json!({
+            "version": 2, "entries": [
+                {"folder_name":"p", "session_id":"one", "branch":"main",
+                 "updated_at":"2026-01-01T00:03:00Z", "points":[
+                    {"id":"a", "text":"old", "submitted_at":"2026-01-01T00:00:00Z"},
+                    {"id":"b", "text":"middle", "submitted_at":"2026-01-01T00:02:00Z"}]},
+                {"folder_name":"p", "session_id":"two", "branch":"other",
+                 "updated_at":"2026-01-01T00:04:00Z", "points":[
+                    {"id":"c", "text":"legacy timestamp"}]},
+                {"folder_name":"q", "session_id":"one", "branch":"main",
+                 "updated_at":"2026-01-01T00:00:00Z", "points":[
+                    {"id":"d", "text":"other project", "submitted_at":"2026-01-01T00:00:00Z"}]}
+            ]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn count_spans_sessions_and_branches_but_not_projects() {
+        let mut doc = fixture();
+        let now = "2026-01-01T00:05:00Z".parse().unwrap();
+        assert!(apply_retention(&mut doc, &[RetentionRule::CountPerProject(2)], now).unwrap());
+        assert_eq!(doc.entries[0].points[0].id.as_deref(), Some("b"));
+        assert_eq!(doc.entries[1].points[0].id.as_deref(), Some("c"));
+        assert_eq!(doc.entries[2].points.len(), 1);
+        assert!(!apply_retention(&mut doc, &[RetentionRule::CountPerProject(2)], now).unwrap());
+    }
+
+    #[test]
+    fn combined_rules_remove_items_matching_either_limit() {
+        let mut doc = fixture();
+        let now = "2026-01-01T00:05:00Z".parse().unwrap();
+        apply_retention(
+            &mut doc,
+            &[
+                RetentionRule::Age(std::time::Duration::from_secs(240)),
+                RetentionRule::CountPerProject(1),
+            ],
+            now,
+        )
+        .unwrap();
+        assert_eq!(doc.entries.len(), 1);
+        assert_eq!(doc.entries[0].points[0].id.as_deref(), Some("c"));
+    }
+
+    #[test]
+    fn no_rules_preserves_all_items() {
+        let mut doc = fixture();
+        let before = serde_json::to_value(&doc).unwrap();
+        assert!(!apply_retention(&mut doc, &[], Utc::now()).unwrap());
+        assert_eq!(serde_json::to_value(doc).unwrap(), before);
+    }
+}

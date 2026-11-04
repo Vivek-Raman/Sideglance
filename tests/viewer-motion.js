@@ -33,6 +33,7 @@ let settings = {
   primaryColor: '#c98c5a',
   textScale: 1,
   projectSortOrder: 'project-directory-asc',
+  statusSortOrder: 'submitted-at-desc',
   autoClearAfterMinutes: null,
 };
 const snapshot = () => ({

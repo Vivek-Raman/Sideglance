@@ -15,6 +15,14 @@ type CommandMap = {
     args: { projectSortOrder: Settings['projectSortOrder'] };
     result: void;
   };
+  set_status_sort_order: {
+    args: { statusSortOrder: Settings['statusSortOrder'] };
+    result: void;
+  };
+  set_max_status_items_per_project: {
+    args: { maxStatusItemsPerProject: number | null };
+    result: void;
+  };
   set_auto_clear_after_minutes: { args: { autoClearAfterMinutes: number | null }; result: void };
   dismiss_point: {
     args: {
