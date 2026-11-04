@@ -1,6 +1,8 @@
 <script lang="ts">
   import { countExpiryKeys, pointKey, projectNames, relativeTime, viewerRows } from './rows';
   import { onMount, tick } from 'svelte';
+  import { fly } from 'svelte/transition';
+  import { isUndoShortcut } from './undo-shortcut';
   import { command } from '../shared/commands';
   import { applyPrimaryColor, applyTheme, systemTheme } from '../shared/theme';
   import { ViewerController, browserTimers } from './controller';
@@ -25,6 +27,25 @@
   let undoing = controller.state.undoing;
   let statusError = controller.state.statusError;
   let appearanceKey = '';
+  let undoNotice = false;
+  let noticeVersion = 0;
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  function showUndoNotice() {
+    if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
+    undoNotice = true;
+    noticeVersion += 1;
+    noticeTimer = window.setTimeout(() => {
+      undoNotice = false;
+      noticeTimer = undefined;
+    }, 5000);
+  }
+  async function undoDismissal() {
+    await controller.undo(
+      (args) => command('restore_point', args),
+      () => command('get_snapshot'),
+    );
+    if (!controller.state.undoCount) undoNotice = false;
+  }
   $: projects = projectNames(entries, settings?.projectSortOrder ?? 'project-directory-asc');
   $: rows = viewerRows(entries, projects, settings?.statusSortOrder);
   $: countExpiring = countExpiryKeys(entries, settings?.maxStatusItemsPerProject ?? null);
@@ -60,7 +81,10 @@
       point,
       pointIndex,
       pointKey(entry, point, pointIndex),
-      (args) => command('dismiss_point', args),
+      async (args) => {
+        await command('dismiss_point', args);
+        showUndoNotice();
+      },
       () => command('get_snapshot'),
     );
   }
@@ -101,6 +125,12 @@
     }
   }
   onMount(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isUndoShortcut(event) || !controller.state.undoCount) return;
+      event.preventDefault();
+      void undoDismissal();
+    };
+    window.addEventListener('keydown', onKeyDown);
     const onFocus = () => {
       windowFocused = true;
     };
@@ -157,6 +187,8 @@
     });
     return () => {
       tornDown = true;
+      window.removeEventListener('keydown', onKeyDown);
+      if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
       window.clearInterval(refreshNow);
       controller.dispose();
       unsubscribeController();
@@ -285,19 +317,25 @@
       aria-label="Increase text size"
       title="Increase text size">A+</button
     >
-    <button
-      onclick={() =>
-        void controller.undo(
-          (args) => command('restore_point', args),
-          () => command('get_snapshot'),
-        )}
-      disabled={!undoCount || undoing || dismissing.size > 0}
-      title="Restore the most recently dismissed line"
-      aria-label={`Undo dismissal, ${undoCount} available`}
-      >Undo{undoCount ? ` (${undoCount})` : ''}</button
-    >
     <button onclick={() => void openSettings()}>Settings</button>
   </div>
+  {#if undoNotice}
+    <div
+      class="undo-notice"
+      role="status"
+      transition:fly={{ y: 12, duration: timers.reducedMotion() ? 0 : 160 }}
+    >
+      <span>Line dismissed</span>
+      <button
+        onclick={() => void undoDismissal()}
+        disabled={undoing || !undoCount}
+        title="Undo dismissal (⌘Z / Ctrl+Z)">Undo</button
+      >
+      {#key noticeVersion}
+        <span class="undo-countdown" aria-hidden="true"></span>
+      {/key}
+    </div>
+  {/if}
   <section
     class="document"
     aria-label="Project status"
@@ -361,6 +399,7 @@
   .document {
     --bottom-text-fade: clamp(64px, 20vh, 124px);
     overflow-anchor: none;
+    padding: 17px 19px;
     padding-bottom: calc(var(--bottom-text-fade) + 24px);
     /* Fade the scrolling content so the background artwork stays crisp beneath it. */
     -webkit-mask-image: linear-gradient(
@@ -382,20 +421,23 @@
     display: flow-root;
   }
   .motion-row h2 {
-    margin: 0 0 0.15em;
+    margin: 0 0 0.2em;
   }
   .motion-row + .motion-row h2 {
-    margin-top: 0.6em;
+    margin-top: 0.8em;
   }
   .motion-row p {
-    margin: 0 0 0.2em;
+    margin: 0 0 0.7em;
     color: var(--muted);
   }
   .motion-row ul {
     margin-bottom: 0;
   }
+  .motion-row ul:not(.branch-end) {
+    padding-bottom: 0.5em;
+  }
   .motion-row ul.branch-end {
-    padding-bottom: 0.85em;
+    padding-bottom: 1.1em;
   }
   button {
     flex: none;
@@ -435,6 +477,51 @@
     aspect-ratio: 1000 / 420;
     opacity: 0.55;
   }
+  .undo-notice {
+    position: fixed;
+    z-index: 3;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    overflow: hidden;
+    padding: 0.35rem 0.6rem 0.35rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.65rem;
+    background: var(--bg);
+    color: var(--text);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 15%);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .undo-notice button {
+    color: var(--accent);
+  }
+  .undo-notice button:focus-visible {
+    outline: 2px solid var(--accent);
+  }
+  .undo-countdown {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--accent);
+    transform-origin: left;
+    animation: undo-countdown 5s linear forwards;
+  }
+  @keyframes undo-countdown {
+    to {
+      transform: scaleX(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .undo-countdown {
+      animation: none;
+    }
+  }
   .document-actions {
     position: fixed;
     z-index: 2;
@@ -471,6 +558,7 @@
   }
   .status-point {
     position: relative;
+    line-height: 1.25;
     transition: opacity 160ms var(--ease-gentle-out);
   }
   .status-point.removing {

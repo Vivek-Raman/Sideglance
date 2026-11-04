@@ -673,3 +673,45 @@ test('undo bounds history, restores newest first, and preserves failed restores'
   assert.equal(controller.state.undoCount, 0);
   controller.dispose();
 });
+
+test('undo requested during dismissal waits for removal and then restores', async () => {
+  const fake = clock(true);
+  let finishDismiss!: () => void;
+  const persisted = new Promise<void>((resolve) => {
+    finishDismiss = resolve;
+  });
+  const motion: ViewerMotion = {
+    exit() {},
+    move(commit) {
+      commit();
+    },
+    enter() {},
+    async dismiss() {},
+    restore() {},
+    dispose() {},
+  };
+  const controller = new ViewerController(fake.api, motion);
+  controller.acceptSettings(settings);
+  const dismissal = controller.dismiss(
+    entry,
+    entry.points[0],
+    0,
+    'p1',
+    () => persisted,
+    async () => snapshot(1, []),
+  );
+  let restored = false;
+  await controller.undo(
+    async () => {
+      restored = true;
+    },
+    async () => snapshot(2),
+  );
+  assert.equal(restored, false);
+  finishDismiss();
+  await dismissal;
+  await microtasks();
+  assert.equal(restored, true);
+  assert.equal(controller.state.undoCount, 0);
+  controller.dispose();
+});

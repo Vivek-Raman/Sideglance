@@ -462,8 +462,16 @@ export class ViewerController {
     restore: (args: { entry: StatusEntry; pointIndex: number }) => Promise<void>,
     getSnapshot: () => Promise<Snapshot>,
   ) {
-    if (this.disposed || this.state.undoing || this.state.dismissing.size || this.layoutPending)
+    if (this.disposed || this.state.undoing) return;
+    if (this.state.dismissing.size || this.layoutPending) {
+      this.phase(
+        'undo',
+        3,
+        () => this.undo(restore, getSnapshot),
+        () => {},
+      );
       return;
+    }
     const item = this.undoStack.at(-1);
     if (!item) return;
     this.state.undoing = true;
