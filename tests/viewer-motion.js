@@ -138,6 +138,35 @@ window.motionResults = (async () => {
   await pause(50);
   await push([entry('Alpha'), entry('Beta'), entry('Gamma')]);
   await pause(1300);
+  const wrappedBelow = find('Alpha point 0');
+  const wrapped = find('Alpha point 1').closest('.motion-row');
+  const wrappedHeight = wrapped.getBoundingClientRect().height;
+  await motion('wrapped text reflows rows below it', wrappedBelow, () =>
+    push(
+      entries.map((item) =>
+        item.folder_name !== 'Alpha'
+          ? item
+          : {
+              ...item,
+              points: item.points.map((itemPoint) =>
+                itemPoint.text === 'Alpha point 1'
+                  ? {
+                      ...itemPoint,
+                      text:
+                        'Alpha point 1 now has enough text to wrap onto another line in the viewer. '.repeat(
+                          4,
+                        ),
+                    }
+                  : itemPoint,
+              ),
+            },
+      ),
+    ),
+  );
+  assert(
+    wrapped.getBoundingClientRect().height > wrappedHeight + 0.5,
+    'updated text did not wrap onto another line',
+  );
   await motion('insert point above another project', find('Gamma point 0'), () =>
     push(entries.map((e, i) => (i ? e : { ...e, points: [...e.points, point('New point')] }))),
   );
@@ -304,7 +333,12 @@ window.motionResults = (async () => {
     assert(Number.isFinite(run.end), `${run.animation.id} never completed`);
     if (!['row-move', 'row-enter'].includes(run.animation.id)) continue;
     for (const other of contentRuns) {
-      if (other === run || other.animation.id === run.animation.id) continue;
+      if (
+        other === run ||
+        other.animation.id === run.animation.id ||
+        other.animation.id === 'row-resize'
+      )
+        continue;
       assert(
         Math.min(run.end, other.end) <= Math.max(run.start, other.start),
         `${run.animation.id} overlapped ${other.animation.id}`,

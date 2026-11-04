@@ -91,13 +91,34 @@ export class RowMotion implements ViewerMotion {
     commit();
     await this.tick();
     if (this.disposed) return;
+
+    const after = new Map(
+      [...this.rows].map(([key, node]) => [key, node.getBoundingClientRect()]),
+    );
+    const resized = [...this.rows].filter(([key]) => {
+      const from = before.get(key);
+      const to = after.get(key);
+      return from && to && Math.abs(from.height - to.height) > 0.5;
+    });
+
+    // A transform can keep following rows visually in place, but it cannot
+    // animate the source row's layout height. Freeze the old height first, so
+    // the browser reflows its siblings as that height grows to the new value.
+    for (const [key, node] of resized) {
+      const from = before.get(key)!;
+      node.style.height = `${from.height}px`;
+      node.style.overflow = 'clip';
+    }
+    const start = new Map(
+      [...this.rows].map(([key, node]) => [key, node.getBoundingClientRect()]),
+    );
     const moves: Promise<void>[] = [];
     for (const [key, node] of this.rows) {
       const from = before.get(key);
+      const initial = start.get(key);
       if (!from || this.fresh.has(key)) continue;
-      const to = node.getBoundingClientRect();
-      const x = from.left - to.left;
-      const y = from.top - to.top;
+      const x = from.left - initial!.left;
+      const y = from.top - initial!.top;
       if (Math.abs(x) > 0.5 || Math.abs(y) > 0.5) {
         moves.push(
           this.animate(
@@ -108,6 +129,21 @@ export class RowMotion implements ViewerMotion {
           ),
         );
       }
+    }
+    for (const [key, node] of resized) {
+      const from = before.get(key)!;
+      const to = after.get(key)!;
+      moves.push(
+        this.animate(
+          node,
+          [{ height: `${from.height}px` }, { height: `${to.height}px` }],
+          this.duration(300),
+          'row-resize',
+        ).then(() => {
+          node.style.height = '';
+          node.style.overflow = '';
+        }),
+      );
     }
     await Promise.all(moves);
   }
