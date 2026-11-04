@@ -40,6 +40,21 @@
       saving = false;
     }
   }
+  async function saveUndoLimit(value: number) {
+    if (!Number.isInteger(value) || value < 1 || value > 100) {
+      settingsError = 'Undo history must be between 1 and 100 items';
+      return;
+    }
+    saving = true;
+    settingsError = '';
+    try {
+      await command('set_undo_limit', { undoLimit: value });
+    } catch (error) {
+      settingsError = errorText(error);
+    } finally {
+      saving = false;
+    }
+  }
   async function saveSortOrder() {
     if (!settings) return;
     saving = true;
@@ -141,6 +156,24 @@
           onchange={() => void savePinnedSetting(settings!.pinned)}
         /> Keep viewer always on top</label
       >
+    </section>
+    <section class="settings-group">
+      <div class="group-heading">
+        <h2>Undo dismissals</h2>
+        <p>Keep the most recent manually dismissed lines for this viewer session.</p>
+      </div>
+      <label
+        >Undo history size
+        <input
+          type="number"
+          min="1"
+          max="100"
+          step="1"
+          value={settings.undoLimit}
+          disabled={saving}
+          onchange={(event) => void saveUndoLimit(Number(event.currentTarget.value))}
+        />
+      </label>
     </section>
     <RetentionSettings
       {settings}

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Settings, SkillInstallation, Snapshot } from './types';
+import type { Settings, SkillInstallation, Snapshot, StatusEntry } from './types';
 
 type CommandMap = {
   get_snapshot: { args: undefined; result: Snapshot };
@@ -24,6 +24,8 @@ type CommandMap = {
     result: void;
   };
   set_auto_clear_after_minutes: { args: { autoClearAfterMinutes: number | null }; result: void };
+  restore_point: { args: { entry: StatusEntry; pointIndex: number }; result: void };
+  set_undo_limit: { args: { undoLimit: number }; result: void };
   dismiss_point: {
     args: {
       folderName: string;

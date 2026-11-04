@@ -68,6 +68,12 @@ pub struct Settings {
     pub auto_clear_after_minutes: Option<u64>,
     #[serde(default)]
     pub max_status_items_per_project: Option<usize>,
+    #[serde(default = "default_undo_limit")]
+    pub undo_limit: usize,
+}
+
+fn default_undo_limit() -> usize {
+    3
 }
 
 fn default_theme() -> Theme {
@@ -97,6 +103,7 @@ impl Default for Settings {
             status_sort_order: StatusSortOrder::default(),
             auto_clear_after_minutes: None,
             max_status_items_per_project: None,
+            undo_limit: default_undo_limit(),
         }
     }
 }
@@ -119,6 +126,9 @@ impl ProjectSortOrder {
 }
 
 fn validate(settings: &Settings) -> Result<(), String> {
+    if !(1..=100).contains(&settings.undo_limit) {
+        return Err("Undo history must be between 1 and 100 items".into());
+    }
     if settings.max_status_items_per_project == Some(0) {
         return Err("Maximum status items must be at least 1".into());
     }

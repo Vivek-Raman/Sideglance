@@ -469,6 +469,8 @@ dependencies = [
  "chrono",
  "fs2",
  "notify",
+ "objc2-app-kit",
+ "objc2-foundation",
  "rmcp",
  "schemars 1.2.2",
  "serde",

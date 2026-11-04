@@ -17,6 +17,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             desktop::commands::get_snapshot,
             desktop::commands::dismiss_point,
+            desktop::commands::restore_point,
+            desktop::commands::set_undo_limit,
             desktop::commands::get_settings,
             desktop::commands::reset_settings,
             desktop::commands::open_settings,
@@ -37,8 +39,11 @@ pub fn run() {
             let settings =
                 preferences::settings_owner(app.handle()).map_err(std::io::Error::other)?;
             app.manage(settings.clone());
-            app.get_webview_window("main")
-                .ok_or_else(|| std::io::Error::other("Main window unavailable"))?
+            let window = app
+                .get_webview_window("main")
+                .ok_or_else(|| std::io::Error::other("Main window unavailable"))?;
+            desktop::windows::restore_native_frame(&window)?;
+            window
                 .set_always_on_top(settings.snapshot().pinned)
                 .map_err(std::io::Error::other)?;
             let path = paths::status_path().map_err(std::io::Error::other)?;
@@ -47,6 +52,7 @@ pub fn run() {
             let _ = status::retention::clear_expired_points(&state, &settings);
             status::snapshot::update(app.handle(), &state);
             status::watcher::start(app.handle().clone(), state, settings);
+            window.show()?;
             Ok(())
         })
         .run(tauri::generate_context!())

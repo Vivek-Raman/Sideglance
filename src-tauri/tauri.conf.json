@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "visible": false,
         "title": "ctx-ppteer",
         "width": 360,
         "height": 220,

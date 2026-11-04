@@ -51,6 +51,33 @@ pub(crate) fn dismiss_point(
 }
 
 #[tauri::command]
+pub(crate) fn restore_point(
+    entry: crate::status::Entry,
+    point_index: usize,
+    app: AppHandle,
+    state: State<'_, Arc<ViewerState>>,
+) -> Result<(), String> {
+    state
+        .store
+        .restore(entry, point_index)
+        .map_err(|error| error.to_string())?;
+    update(&app, &state);
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) fn set_undo_limit(
+    undo_limit: usize,
+    owner: State<'_, Arc<SettingsOwner>>,
+) -> Result<(), String> {
+    owner.update(|settings| {
+        settings.undo_limit = undo_limit;
+        Ok(())
+    })?;
+    Ok(())
+}
+
+#[tauri::command]
 pub(crate) fn get_settings(owner: State<'_, Arc<SettingsOwner>>) -> Result<Settings, String> {
     Ok(owner.snapshot())
 }

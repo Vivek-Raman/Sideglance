@@ -21,6 +21,8 @@
   let settings = controller.state.settings;
   let pendingRemoval = controller.state.pendingRemoval;
   let dismissing = controller.state.dismissing;
+  let undoCount = controller.state.undoCount;
+  let undoing = controller.state.undoing;
   let statusError = controller.state.statusError;
   let appearanceKey = '';
   $: projects = projectNames(entries, settings?.projectSortOrder ?? 'project-directory-asc');
@@ -116,7 +118,8 @@
     document.addEventListener('selectionchange', onSelection);
     let tornDown = false;
     const unsubscribeController = controller.subscribe((next) => {
-      ({ entries, settings, pendingRemoval, dismissing, statusError, now } = next);
+      ({ entries, settings, pendingRemoval, dismissing, undoCount, undoing, statusError, now } =
+        next);
     });
     const sourceLifecycle = startEventReadLifecycle<Snapshot>({
       listen: (onValue) => listenTauri('source-update', onValue),
@@ -281,6 +284,17 @@
       disabled={!settings || settings.textScale >= textScales[textScales.length - 1]}
       aria-label="Increase text size"
       title="Increase text size">A+</button
+    >
+    <button
+      onclick={() =>
+        void controller.undo(
+          (args) => command('restore_point', args),
+          () => command('get_snapshot'),
+        )}
+      disabled={!undoCount || undoing || dismissing.size > 0}
+      title="Restore the most recently dismissed line"
+      aria-label={`Undo dismissal, ${undoCount} available`}
+      >Undo{undoCount ? ` (${undoCount})` : ''}</button
     >
     <button onclick={() => void openSettings()}>Settings</button>
   </div>

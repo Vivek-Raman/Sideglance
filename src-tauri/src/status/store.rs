@@ -184,6 +184,36 @@ impl StatusStore {
         self.save_unlocked(&document)?;
         Ok(true)
     }
+    /// Merge one dismissed point without replacing newer agent submissions.
+    pub fn restore(&self, mut saved: Entry, index: usize) -> Result<(), StatusError> {
+        let _lock = self.lock()?;
+        let mut document = self.read_unlocked()?;
+        if saved.points.len() != 1 {
+            return Err(StatusError::InvalidInput(
+                "Undo requires exactly one point".into(),
+            ));
+        }
+        let point = saved.points.remove(0);
+        if let Some(entry) = document.entries.iter_mut().find(|entry| {
+            entry.folder_name == saved.folder_name
+                && entry.session_id == saved.session_id
+                && (saved.session_id.is_some() || entry.branch == saved.branch)
+        }) {
+            if entry.branch != saved.branch || entry.points.iter().any(|p| p.id == point.id) {
+                return Err(StatusError::Conflict(
+                    "This point has changed or already exists.".into(),
+                ));
+            }
+            entry.points.insert(index.min(entry.points.len()), point);
+        } else {
+            saved.points.push(point);
+            document.entries.push(saved);
+        }
+        document.version = 2;
+        domain::validate(&document).map_err(StatusError::InvalidDocument)?;
+        self.save_unlocked(&document)?;
+        Ok(())
+    }
     pub fn apply_retention(&self, rules: &[domain::RetentionRule]) -> Result<bool, StatusError> {
         let _lock = self.lock()?;
         let mut document = self.read_unlocked()?;
@@ -215,6 +245,33 @@ mod tests {
             submitted_at: None,
             id: None,
         }
+    }
+
+    #[test]
+    fn undo_merges_newer_points_and_recreates_empty_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = StatusStore::new(dir.path().join("status.json"));
+        store
+            .upsert("p".into(), "s".into(), "main".into(), vec![point("old")])
+            .unwrap();
+        let saved = store.read().unwrap().entries.remove(0);
+        let id = saved.points[0].id.as_deref().unwrap();
+        assert!(store
+            .dismiss("p", Some("s"), "main", &saved.updated_at, id, None)
+            .unwrap());
+        store.restore(saved.clone(), 0).unwrap();
+        assert_eq!(store.read().unwrap().entries[0], saved);
+        assert!(store.restore(saved.clone(), 0).is_err());
+        assert!(store
+            .dismiss("p", Some("s"), "main", &saved.updated_at, id, None)
+            .unwrap());
+        store
+            .upsert("p".into(), "s".into(), "main".into(), vec![point("new")])
+            .unwrap();
+        store.restore(saved.clone(), 0).unwrap();
+        let current = store.read().unwrap().entries.remove(0);
+        assert_eq!(current.points[0], saved.points[0]);
+        assert_eq!(current.points[1].text, "new");
     }
 
     #[test]

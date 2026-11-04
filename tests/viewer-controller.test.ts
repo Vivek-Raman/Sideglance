@@ -12,6 +12,7 @@ const settings: Settings = {
   statusSortOrder: 'submitted-at-desc',
   autoClearAfterMinutes: null,
   maxStatusItemsPerProject: null,
+  undoLimit: 3,
 };
 const entry: StatusEntry = {
   folder_name: 'demo',
@@ -622,4 +623,53 @@ test('animation failures release the phase and disposal ignores late completions
   controller.dispose();
   await microtasks();
   assert.equal(view.entrances.length, 0);
+});
+
+test('undo bounds history, restores newest first, and preserves failed restores', async () => {
+  const fake = clock(true);
+  const motion: ViewerMotion = {
+    exit() {},
+    move(commit) {
+      commit();
+    },
+    enter() {},
+    async dismiss() {},
+    restore() {},
+    dispose() {},
+  };
+  const controller = new ViewerController(fake.api, motion);
+  controller.acceptSettings(settings);
+  for (let i = 0; i < 4; i++) {
+    const point = { ...entry.points[0], id: 'p' + i };
+    await controller.dismiss(
+      entry,
+      point,
+      0,
+      'p' + i,
+      async () => {},
+      async () => snapshot(i + 1, []),
+    );
+    await microtasks();
+  }
+  assert.equal(controller.state.undoCount, 3);
+  await controller.undo(
+    async () => {
+      throw new Error('disk failed');
+    },
+    async () => snapshot(5),
+  );
+  assert.equal(controller.state.undoCount, 3);
+  const restored: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    await controller.undo(
+      async ({ entry }) => {
+        restored.push(entry.points[0].id!);
+      },
+      async () => snapshot(6 + i),
+    );
+    await microtasks();
+  }
+  assert.deepEqual(restored, ['p3', 'p2', 'p1']);
+  assert.equal(controller.state.undoCount, 0);
+  controller.dispose();
 });

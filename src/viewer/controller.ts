@@ -9,6 +9,8 @@ export type ViewerState = {
   selectedText: boolean;
   pendingRemoval: Set<string>;
   dismissing: Set<string>;
+  undoCount: number;
+  undoing: boolean;
   statusError: string;
   now: number;
 };
@@ -45,6 +47,8 @@ const initialState = (): ViewerState => ({
   selectedText: false,
   pendingRemoval: new Set(),
   dismissing: new Set(),
+  undoCount: 0,
+  undoing: false,
   statusError: '',
   now: Date.now(),
 });
@@ -107,6 +111,7 @@ export class ViewerController {
   readonly state: ViewerState = initialState();
   private readonly animations = new AnimationQueue();
   private readonly motion?: ViewerMotion;
+  private undoStack: { entry: StatusEntry; pointIndex: number }[] = [];
   private layoutPending = false;
   private motionTimer: ReturnType<typeof setTimeout> | undefined;
   private expiryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -168,6 +173,8 @@ export class ViewerController {
   }
   acceptSettings(value: Settings) {
     if (this.disposed) return;
+    this.undoStack = this.undoStack.slice(-(value.undoLimit ?? 3));
+    this.state.undoCount = this.undoStack.length;
     this.state.pendingSettings = value;
     this.flushPending();
   }
@@ -355,6 +362,7 @@ export class ViewerController {
   ): Promise<void> {
     if (
       this.disposed ||
+      this.state.undoing ||
       this.state.dismissing.has(removeKey) ||
       this.state.pendingRemoval.has(removeKey)
     )
@@ -407,9 +415,9 @@ export class ViewerController {
     try {
       await Promise.race([
         (async () => {
-          const request = Promise.resolve().then(() => {
+          const request = Promise.resolve().then(async () => {
             if (this.disposed) return;
-            return run({
+            await run({
               folderName: entry.folder_name,
               sessionId: entry.session_id,
               branch: entry.branch,
@@ -417,6 +425,14 @@ export class ViewerController {
               pointId: point.id ?? null,
               pointIndex: point.id ? null : pointIndex,
             });
+            if (!this.disposed) {
+              this.undoStack.push({ entry: { ...entry, points: [{ ...point }] }, pointIndex });
+              this.undoStack = this.undoStack.slice(
+                -(this.state.pendingSettings?.undoLimit ?? this.state.settings?.undoLimit ?? 3),
+              );
+              this.state.undoCount = this.undoStack.length;
+              this.notify();
+            }
           });
           await Promise.all([request, exit]);
           if (this.disposed) return;
@@ -440,6 +456,33 @@ export class ViewerController {
         this.dismissalTimers.delete(exitTimer);
       }
       this.teardownWaiters.delete(resolveDisposed);
+    }
+  }
+  async undo(
+    restore: (args: { entry: StatusEntry; pointIndex: number }) => Promise<void>,
+    getSnapshot: () => Promise<Snapshot>,
+  ) {
+    if (this.disposed || this.state.undoing || this.state.dismissing.size || this.layoutPending)
+      return;
+    const item = this.undoStack.at(-1);
+    if (!item) return;
+    this.state.undoing = true;
+    this.notify();
+    try {
+      await restore(item);
+      if (this.disposed) return;
+      // Consume only after persistence succeeds. A failed refresh must not
+      // restore the same point a second time.
+      const index = this.undoStack.indexOf(item);
+      if (index >= 0) this.undoStack.splice(index, 1);
+      this.state.undoCount = this.undoStack.length;
+      this.state.statusError = '';
+      this.acceptSnapshot(await getSnapshot());
+    } catch (error) {
+      this.setError(error);
+    } finally {
+      this.state.undoing = false;
+      this.notify();
     }
   }
   dispose() {
