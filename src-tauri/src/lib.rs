@@ -9,7 +9,7 @@ pub mod status;
 
 use desktop::windows::install_menu;
 
-pub(crate) const SKILL_NAME: &str = "ctx-ppteer";
+pub(crate) const SKILL_NAME: &str = "sideglance";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

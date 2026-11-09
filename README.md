@@ -1,41 +1,63 @@
-# ctx-ppteer
+<p align="center"><img src="src-tauri/icons/icon.svg" width="96" alt="Sideglance icon" /></p>
 
-ctx-ppteer is a compact Tauri desktop status viewer. Agents send structured points through its MCP server, and the window refreshes when the JSON changes. Project headings, branch text, bullets, appearance, and always-on-top behavior retain the existing layout. Session IDs are stored but not displayed.
+# Sideglance
 
-The MCP manages `~/.local/share/ctx-ppteer/status.json`, shared with the desktop app on all platforms. It works before the app is opened. Settings remain in `~/.config/ctx-ppteer/settings.json`. The settings page controls appearance, always-on-top behavior, project order, and agent integration. Old source-path, window, and Markdown editor preferences are ignored. Existing Markdown files remain untouched and are no longer loaded.
+**Your coding agents, at a glance.**
 
-## Status schema and MCP
+Running agents across several projects means checking several conversations for progress. Sideglance puts their reported updates in a compact desktop window, grouped by project and branch.
 
-The schema is defined in [status.schema.json](status.schema.json). Documents with version `1` remain readable. Successful writes migrate them to version `2`. Each entry stores `folder_name`, nullable `session_id`, `branch`, `points`, and a server-generated RFC 3339 `updated_at` timestamp. Points contain plain `text`, `done`, an optional HTTP or HTTPS `link`, a stable server-assigned `id`, and a `submitted_at` timestamp. An existing point ID keeps its identity through edits, and its submitted time is preserved when the caller omits a replacement timestamp. A caller-supplied valid timestamp is retained. Legacy points receive deterministic IDs on read, so refreshes do not remount them.
+Pin it above your editor. See what agents are working on, what they've reported complete, and follow links to related work.
 
-Both MCP tools require `folder_name` and a non-empty real `session_id`. `read_status` returns only the matching project's session record. `write_status` also accepts `branch` and the complete revised `points` list, replacing that record. Agents read first, then revise text, completion flags, and links. Omitted points are removed; superseded text is not retained as history. Anonymous writes and project-wide MCP reads are not supported. Existing records with a null session ID remain viewable for compatibility.
+[Download the latest release](https://github.com/Vivek-Raman/ctx-ppteer/releases/latest) · [Setup and technical reference](docs/technical-reference.md) · [Report an issue](https://github.com/Vivek-Raman/ctx-ppteer/issues)
 
-The supplied session ID identifies the record; it is not authentication of the calling harness. Writers hold an OS lock on a stable sidecar file for the entire read/modify/write operation, then atomically replace the JSON. Invalid JSON is reported and preserved. Documents are limited to 1 MiB.
+## Keep the work in view
 
-The viewer renders points directly with Svelte and keeps the last valid view if a read fails. It groups by project and branch, with no session labels. Dismissal sends the point ID plus the entry snapshot timestamp; the old point index remains accepted for compatibility. Markdown rendering, source-file selection, and whole-document editing have been removed.
+- **One board across projects.** Scan agent updates grouped by project and Git branch.
+- **A window that stays visible.** Enable always-on-top while you work in your editor.
+- **Updates from your agents.** Connected agents publish and revise short reports through MCP.
+- **Less clutter.** Dismiss individual updates or enable age-based cleanup.
+- **Your preferred view.** Adjust theme, color, text size, and project order.
 
-External edits to settings are read at startup. Restart the app after changing `settings.json` outside the app.
+Status data stays on your machine. The bundled MCP server receives reports even when the window is closed.
 
-After upgrading the app, update installed copies of the skill through Settings. Older app and MCP processes cannot read version 2 documents, so upgrade and restart them before the first write. The previous Markdown `status` argument is no longer supported. This project does not migrate a user's status file until a successful write occurs.
+## Get started
+
+1. Download a desktop bundle for your platform from [Releases](https://github.com/Vivek-Raman/ctx-ppteer/releases). Release builds target macOS, Windows, and Linux.
+2. Install and open Sideglance, then open **Settings → Agent integration**.
+3. Install the bundled skill and configure MCP for your agent. Codex and Claude Code both have setup support for these two steps.
+4. Restart your agent client if needed to load its new configuration, then start a fresh conversation.
+5. Ask your agent: "Use the sideglance skill to report this task in Sideglance."
+
+Reporting requires a real session ID from the agent client. Configuration alone does not prove reporting works; confirm that your first update appears in the board.
+
+## Agent integrations
+
+Settings can install both the skill and MCP registration for Codex, Claude Code, Antigravity, and OpenCode. Cursor has MCP registration support; Gemini has skill installation support. These partial integrations require additional setup for reporting.
+
+Sideglance shows what agents report. A visible update does not prove an agent is still running, and a completion mark is the agent's report of completion. Sideglance does not run or schedule agents.
+
+## Upgrading from ctx-ppteer
+
+Sideglance now uses `sideglance` for its executable, skill, MCP registration, and storage directories. On first use, existing status and settings files are copied from the old `ctx-ppteer` directories if the new files do not exist. Originals remain as backups; subsequent updates go only to Sideglance.
+
+Quit the old app and stop its MCP processes before upgrading. Install Sideglance, then install the skill and configure MCP for each client in Settings. Skill installation disables the old skill by backing up its `SKILL.md`; MCP registration replaces the old server key. Restart your agent clients to load the new tools. Update any custom instructions to invoke `sideglance`.
+
+The app identifier has changed, so operating-system window placement and permissions may need to be set again. The GitHub repository and its links retain the old name until the repository is renamed.
 
 ## Development
 
-Source is organized by responsibility. The frontend keeps app entry points at `src/`, with viewer code in `src/viewer/`, settings in `src/settings/`, integrations in `src/integrations/`, and shared types and Tauri helpers in `src/shared/`. Rust puts status storage and refresh code in `src-tauri/src/status/`, preferences in `preferences/`, desktop commands and windows in `desktop/`, and integration adapters in `integrations/`.
+Requires Node 22 or newer, npm, Rust, and the Tauri platform prerequisites.
 
 ```sh
 npm install
 npm run dev
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
 npm test
+cargo test --manifest-path src-tauri/Cargo.toml
 npm run format:check
 ```
 
-The local checks need Node 22 or newer for `--experimental-strip-types`, npm, Rust, and the Tauri platform prerequisites. Install the Playwright browser once with `npx playwright install chromium` before running `npm run test:motion`. The motion test uses the fixture under `tests/` and does not access real app data.
+Build a desktop bundle with `npm run tauri build`. See the [technical reference](docs/technical-reference.md) for the status schema, MCP contract, source layout, and motion checks.
 
-To build a desktop bundle, install Rust and the Tauri prerequisites, then run `npm run tauri build`.
+## License
 
-For frame-by-frame viewer motion regression checks, run `npm run dev` and open
-`http://localhost:1420/tests/viewer-motion.html`. The tab title reports pass/fail;
-`await window.motionResults` in the browser console returns each result.
-The fixture mocks Tauri IPC and does not change your saved statuses.
+[GPL-3.0-only](LICENSE).

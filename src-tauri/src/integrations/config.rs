@@ -44,6 +44,12 @@ pub(crate) fn register_codex_mcp_at(path: &Path, executable: &Path) -> Result<()
     };
     let mut document = DocumentMut::from_str(&contents)
         .map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
+    if let Some(servers) = document
+        .get_mut("mcp_servers")
+        .and_then(|v| v.as_table_like_mut())
+    {
+        servers.remove("ctx-ppteer");
+    }
     document["mcp_servers"][SKILL_NAME]["command"] =
         value(executable.to_string_lossy().to_string());
     document["mcp_servers"][SKILL_NAME]["args"] = value(Array::from_iter(["--mcp"]));
@@ -171,6 +177,7 @@ fn save_config(path: &Path, contents: &[u8]) -> Result<(), String> {
 pub(crate) fn register_standard_json_mcp(path: &Path, executable: &Path) -> Result<(), String> {
     let mut config = read_json_config(path)?;
     let servers = nested_object_mut(&mut config, &["mcpServers"], &path.display().to_string())?;
+    servers.remove("ctx-ppteer");
     servers.insert(
         SKILL_NAME.into(),
         json!({ "command": executable, "args": ["--mcp"] }),
@@ -185,6 +192,7 @@ pub(crate) fn register_opencode_mcp(path: &Path, executable: &Path) -> Result<()
         &["mcp", "servers"],
         &path.display().to_string(),
     )?;
+    servers.remove("ctx-ppteer");
     servers.insert(
         SKILL_NAME.into(),
         json!({ "type": "local", "command": [executable, "--mcp"], "codemode": false }),
@@ -224,7 +232,7 @@ pub(crate) fn command_exists(command: &str) -> bool {
     })
 }
 
-pub(crate) fn install_claude_mcp(executable: &Path) -> Result<bool, String> {
+pub(crate) fn install_claude_mcp(executable: &Path, config_path: &Path) -> Result<bool, String> {
     let output = match Command::new("claude")
         .args(["mcp", "add", SKILL_NAME, "--scope", "user", "--"])
         .arg(executable)
@@ -236,6 +244,12 @@ pub(crate) fn install_claude_mcp(executable: &Path) -> Result<bool, String> {
         Err(error) => return Err(format!("Unable to run Claude Code: {error}")),
     };
     if output.status.success() {
+        let mut config = read_json_config(config_path)?;
+        if existing_nested_object_mut(&mut config, &["mcpServers"])
+            .is_some_and(|servers| servers.remove("ctx-ppteer").is_some())
+        {
+            save_json_config(config_path, &config)?;
+        }
         Ok(true)
     } else {
         Err(format!(
@@ -270,10 +284,43 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn registration_replaces_legacy_keys_and_preserves_other_servers() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        for contents in [
+            "[mcp_servers.ctx-ppteer]\ncommand = 'old'\n[mcp_servers.other]\ncommand = 'other'\n",
+            "mcp_servers = { ctx-ppteer = { command = 'old' }, other = { command = 'other' } }",
+        ] {
+            fs::write(&path, contents).unwrap();
+            register_codex_mcp_at(&path, Path::new("sideglance")).unwrap();
+            let saved = fs::read_to_string(&path).unwrap();
+            assert!(!saved.contains("ctx-ppteer"));
+            assert!(saved.contains("other"));
+            assert!(codex_mcp_registered_at(&path).unwrap());
+        }
+        for keys in [vec!["mcpServers"], vec!["mcp", "servers"]] {
+            let mut config = json!({});
+            let servers = nested_object_mut(&mut config, &keys, "test").unwrap();
+            servers.insert("ctx-ppteer".into(), json!({"command":"old"}));
+            servers.insert("other".into(), json!({"command":"other"}));
+            save_json_config(&path, &config).unwrap();
+            if keys.len() == 1 {
+                register_standard_json_mcp(&path, Path::new("sideglance")).unwrap();
+            } else {
+                register_opencode_mcp(&path, Path::new("sideglance")).unwrap();
+            }
+            let saved = fs::read_to_string(&path).unwrap();
+            assert!(!saved.contains("ctx-ppteer"));
+            assert!(saved.contains("other"));
+            assert!(json_mcp_registered(&path, &keys).unwrap());
+        }
+    }
+
+    #[test]
     fn mcp_changes_preserve_existing_config_permissions() {
         use std::os::unix::fs::PermissionsExt;
         let directory = tempfile::tempdir().unwrap();
-        let executable = Path::new("/Applications/ctx-ppteer");
+        let executable = Path::new("/Applications/sideglance");
         for mode in [0o600, 0o640] {
             let toml = directory.path().join("config.toml");
             fs::write(&toml, "# existing configuration\n").unwrap();
@@ -320,7 +367,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let sentinel = directory.path().join("sentinel");
         fs::write(&sentinel, "untouched").unwrap();
-        let executable = Path::new("/Applications/ctx-ppteer");
+        let executable = Path::new("/Applications/sideglance");
         let toml = directory.path().join("config.toml");
         let json = directory.path().join("config.json");
         for extension in ["toml.tmp", "json.tmp"] {
@@ -350,7 +397,7 @@ mod tests {
     #[test]
     fn recognizes_inline_codex_mcp_server() {
         let document = DocumentMut::from_str(
-            "[mcp_servers]\nctx-ppteer = { command = \"/Applications/ctx-ppteer\", args = [\"--mcp\"] }\n",
+            "[mcp_servers]\nsideglance = { command = \"/Applications/sideglance\", args = [\"--mcp\"] }\n",
         )
         .unwrap();
         assert!(document_has_codex_mcp(&document));
@@ -359,7 +406,7 @@ mod tests {
     #[test]
     fn recognizes_inline_codex_mcp_servers_table() {
         let document = DocumentMut::from_str(
-            "mcp_servers = { ctx-ppteer = { command = \"/Applications/ctx-ppteer\", args = [\"--mcp\"] } }\n",
+            "mcp_servers = { sideglance = { command = \"/Applications/sideglance\", args = [\"--mcp\"] } }\n",
         )
         .unwrap();
         assert!(document_has_codex_mcp(&document));
@@ -374,7 +421,7 @@ mod tests {
             "mcp_servers = { existing = { command = \"existing\" } }\n",
         )
         .unwrap();
-        register_codex_mcp_at(&path, Path::new("/Applications/ctx-ppteer")).unwrap();
+        register_codex_mcp_at(&path, Path::new("/Applications/sideglance")).unwrap();
         let document = DocumentMut::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert!(document_has_codex_mcp(&document));
         assert!(document
@@ -389,7 +436,7 @@ mod tests {
     fn unregisters_inline_codex_mcp_servers_table() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("config.toml");
-        fs::write(&path, "mcp_servers = { ctx-ppteer = { command = \"ctx-ppteer\" }, existing = { command = \"existing\" } }\n").unwrap();
+        fs::write(&path, "mcp_servers = { sideglance = { command = \"sideglance\" }, existing = { command = \"existing\" } }\n").unwrap();
         unregister_codex_mcp_at(&path).unwrap();
         let document = DocumentMut::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert!(!document_has_codex_mcp(&document));
@@ -410,7 +457,7 @@ mod tests {
             r#"{"mcpServers":{"existing":{"command":"existing"}}}"#,
         )
         .unwrap();
-        register_standard_json_mcp(&path, Path::new("/Applications/ctx-ppteer")).unwrap();
+        register_standard_json_mcp(&path, Path::new("/Applications/sideglance")).unwrap();
         assert!(json_mcp_registered(&path, &["mcpServers"]).unwrap());
         unregister_json_mcp(&path, &["mcpServers"]).unwrap();
         let config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
@@ -427,7 +474,7 @@ mod tests {
             r#"{"mcpServers":{"existing":{"command":"existing"}}}"#,
         )
         .unwrap();
-        register_standard_json_mcp(&path, Path::new("/Applications/ctx-ppteer")).unwrap();
+        register_standard_json_mcp(&path, Path::new("/Applications/sideglance")).unwrap();
         let config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         assert!(config["mcpServers"]["existing"].is_object());
         assert_eq!(config["mcpServers"][SKILL_NAME]["args"][0], "--mcp");
@@ -439,7 +486,7 @@ mod tests {
         let path = directory.path().join("mcp.json");
         fs::write(&path, "\n").unwrap();
         assert!(!json_mcp_registered(&path, &["mcpServers"]).unwrap());
-        register_standard_json_mcp(&path, Path::new("/Applications/ctx-ppteer")).unwrap();
+        register_standard_json_mcp(&path, Path::new("/Applications/sideglance")).unwrap();
         let config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         assert!(config["mcpServers"][SKILL_NAME].is_object());
     }
@@ -450,7 +497,7 @@ mod tests {
         let path = directory.path().join("mcp.json");
         fs::write(
             &path,
-            r#"{"mcpServers":{"ctx-ppteer":{"command":"ctx-ppteer"},"existing":{"command":"existing"}}}"#,
+            r#"{"mcpServers":{"sideglance":{"command":"sideglance"},"existing":{"command":"existing"}}}"#,
         )
         .unwrap();
         unregister_json_mcp(&path, &["mcpServers"]).unwrap();
@@ -468,7 +515,7 @@ mod tests {
             r#"{"mcp":{"servers":{"existing":{"type":"local"}}}}"#,
         )
         .unwrap();
-        register_opencode_mcp(&path, Path::new("/Applications/ctx-ppteer")).unwrap();
+        register_opencode_mcp(&path, Path::new("/Applications/sideglance")).unwrap();
         let config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         assert!(config["mcp"]["servers"]["existing"].is_object());
         assert_eq!(config["mcp"]["servers"][SKILL_NAME]["type"], "local");

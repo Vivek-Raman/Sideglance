@@ -1,4 +1,4 @@
-name: Release ctx-ppteer
+name: Release Sideglance
 
 on:
   release:
@@ -65,7 +65,7 @@ jobs:
         with:
           tagName: ${{ github.event.release.tag_name }}
           releaseId: ${{ github.event.release.id }}
-          releaseName: ctx-ppteer ${{ github.event.release.tag_name }}
+          releaseName: Sideglance ${{ github.event.release.tag_name }}
           releaseBody: ${{ github.event.release.body }}
           releaseDraft: false
           prerelease: ${{ github.event.release.prerelease }}

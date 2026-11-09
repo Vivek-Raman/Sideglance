@@ -140,7 +140,7 @@
 <main class="settings-page">
   <header>
     <h1>Settings</h1>
-    <p>Choose what ctx-ppteer shows and how it appears.</p>
+    <p>Choose what Sideglance shows and how it appears.</p>
   </header>
   {#if settings}
     <AppearanceSettings {settings} {primaryColors} onSave={() => void saveAppearanceSettings()} />

@@ -1,10 +1,10 @@
 ---
-name: release-ctx-ppteer
+name: release-sideglance
 disable-model-invocation: true
-description: Create and verify a major or minor GitHub release for ctx-ppteer, with an explicit version and publish confirmation.
+description: Create and verify a major or minor GitHub release for sideglance, with an explicit version and publish confirmation.
 ---
 
-# Release ctx-ppteer
+# Release sideglance
 
 Use this skill only when explicitly invoked to release this repository. Model invocation is disabled.
 
@@ -35,7 +35,7 @@ Use this skill only when explicitly invoked to release this repository. Model in
 4. Create the GitHub release with GitHub CLI, targeting the pushed commit and using tag `v<new-version>`. Use generated notes unless the user supplied release notes:
 
    ```sh
-   gh release create "v<new-version>" --target "$(git rev-parse HEAD)" --title "ctx-ppteer v<new-version>" --generate-notes
+   gh release create "v<new-version>" --target "$(git rev-parse HEAD)" --title "sideglance v<new-version>" --generate-notes
    ```
 
 ## Follow through to completion

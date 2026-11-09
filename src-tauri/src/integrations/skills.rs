@@ -126,6 +126,7 @@ pub(crate) fn install_at(source: &Path, destination: &Path) -> Result<bool, Stri
         fs::remove_dir_all(destination)
             .map_err(|error| format!("Unable to replace {}: {error}", destination.display()))?;
         copy_directory(source, destination)?;
+        retire_legacy_skill(destination)?;
         return Ok(true);
     }
     if destination.exists() {
@@ -135,7 +136,26 @@ pub(crate) fn install_at(source: &Path, destination: &Path) -> Result<bool, Stri
         ));
     }
     copy_directory(source, destination)?;
+    retire_legacy_skill(destination)?;
     Ok(true)
+}
+
+fn retire_legacy_skill(destination: &Path) -> Result<(), String> {
+    if destination.file_name().and_then(|name| name.to_str()) != Some(SKILL_NAME) {
+        return Ok(());
+    }
+    let legacy = destination.with_file_name("ctx-ppteer").join("SKILL.md");
+    if legacy.is_file() {
+        // Preserve customized instructions, but remove the discoverable skill entry point.
+        let backup = legacy.with_file_name(format!("SKILL.md.{}.backup", uuid::Uuid::new_v4()));
+        fs::rename(&legacy, &backup).map_err(|error| {
+            format!(
+                "Sideglance installed, but unable to retire {}: {error}",
+                legacy.display()
+            )
+        })?;
+    }
+    Ok(())
 }
 
 pub(crate) fn targets(
@@ -170,6 +190,33 @@ pub(crate) fn target(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn install_retires_legacy_skill_without_losing_custom_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("SKILL.md"), "new skill").unwrap();
+        let legacy = dir.path().join("ctx-ppteer");
+        fs::create_dir(&legacy).unwrap();
+        fs::write(legacy.join("SKILL.md"), "custom instructions").unwrap();
+        let destination = dir.path().join(SKILL_NAME);
+        install_at(&source, &destination).unwrap();
+        assert_eq!(
+            fs::read_to_string(destination.join("SKILL.md")).unwrap(),
+            "new skill"
+        );
+        assert!(!legacy.join("SKILL.md").exists());
+        let backup = fs::read_dir(&legacy)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert_eq!(fs::read_to_string(backup).unwrap(), "custom instructions");
+        install_at(&source, &destination).unwrap();
+        assert_eq!(fs::read_dir(legacy).unwrap().count(), 1);
+    }
 
     #[test]
     fn hashes_skill_contents_and_paths() {

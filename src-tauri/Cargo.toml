@@ -1,13 +1,13 @@
 [package]
-name = "ctx-ppteer"
+name = "sideglance"
 version = "1.3.0"
-description = "A lightweight agent status viewer"
+description = "A desktop status board for coding agents"
 license = "GPL-3.0-only"
-authors = ["ctx-ppteer contributors"]
+authors = ["Sideglance contributors"]
 edition = "2021"
 
 [lib]
-name = "ctx_ppteer_lib"
+name = "sideglance_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -2,6 +2,7 @@ node_modules/
 dist/
 src-tauri/target/
 .DS_Store
-docs/
+docs/*
+!docs/technical-reference.md
 test-results/
 playwright-report/

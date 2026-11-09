@@ -92,7 +92,7 @@
       <h3>Auto-clear status items</h3>
       <p>
         Select any combination of deletion rules. Items are removed when any selected rule applies.
-        Cleanup only runs while ctx-ppteer is open.
+        Cleanup only runs while Sideglance is open.
       </p>
     </div>
     <label class="checkbox"

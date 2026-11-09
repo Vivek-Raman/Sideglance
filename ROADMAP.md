@@ -1,10 +1,10 @@
-# ctx-ppteer product audit and roadmap
+# sideglance product audit and roadmap
 
 Reviewed 2026-10-20 against `main` at `4f822ee`, version `0.2.0`. This replaces the earlier Markdown-viewer audit.
 
 ## Recommendation
 
-Keep ctx-ppteer focused on a reliable personal overview of coding-agent work. The refactor improves normal concurrent writes, session isolation, rendering, dismissal, and settings behavior. The highest priorities are now crash recovery, understandable freshness and empty states, and setup that proves an agent can publish.
+Keep sideglance focused on a reliable personal overview of coding-agent work. The refactor improves normal concurrent writes, session isolation, rendering, dismissal, and settings behavior. The highest priorities are now crash recovery, understandable freshness and empty states, and setup that proves an agent can publish.
 
 Do not carry the old Markdown editing and whole-document conflict roadmap forward. Those flows were removed. Retention safety and project/session attribution are the next product decisions.
 
@@ -32,7 +32,7 @@ Evidence labels below mean:
 
 ## Product today
 
-ctx-ppteer is a local desktop status board. Agents publish structured plain-text points through MCP. Each project/session record contains a branch and revised point list; points have stable IDs, completion flags, optional HTTP/HTTPS links, and submission timestamps. The viewer groups points by project and branch, hides session labels, and updates as the JSON changes.
+sideglance is a local desktop status board. Agents publish structured plain-text points through MCP. Each project/session record contains a branch and revised point list; points have stable IDs, completion flags, optional HTTP/HTTPS links, and submission timestamps. The viewer groups points by project and branch, hides session labels, and updates as the JSON changes.
 
 The MCP manages its own fixed status path and works before the viewer is opened. Users can dismiss individual points, enable age-based auto-clear, choose project ordering, change theme/color/text size, pin the viewer, reset preferences, and install skills and MCP registration for supported harnesses.
 
@@ -68,7 +68,7 @@ The code and skill establish an intended workflow, not a measured customer segme
 
 **Observed friction:** separate skill/MCP lists, no verification action, and no first-run guidance in an empty viewer. **Code-derived risk:** updating a skill removes the existing target directory before copying; a failed copy can leave an incomplete installation or remove local customization. A registration row can appear configured despite a bad executable command.
 
-Sources: [integration UI](src/integrations/AgentIntegrations.svelte), [skills installer](src-tauri/src/integrations/skills.rs), [registration check](src-tauri/src/integrations/config.rs), [bundled skill](src-tauri/resources/skills/ctx-ppteer/SKILL.md), [upgrade notes](README.md).
+Sources: [integration UI](src/integrations/AgentIntegrations.svelte), [skills installer](src-tauri/src/integrations/skills.rs), [registration check](src-tauri/src/integrations/config.rs), [bundled skill](src-tauri/resources/skills/sideglance/SKILL.md), [upgrade notes](README.md).
 
 ### 2. Check progress while working elsewhere
 
@@ -197,7 +197,7 @@ Scores below are recomputed from explicit inputs and supersede the earlier audit
 
 ### 3. Verify first publication and upgrades
 
-**Problem/evidence:** skill installation, MCP configuration, schema compatibility, and real session identity are separate requirements. Current registration checks presence and Settings has no verify action. Updating a skill removes the destination before copying. See [integration UI](src/integrations/AgentIntegrations.svelte), [config](src-tauri/src/integrations/config.rs), [skills](src-tauri/src/integrations/skills.rs), [README](README.md), [bundled skill](src-tauri/resources/skills/ctx-ppteer/SKILL.md).
+**Problem/evidence:** skill installation, MCP configuration, schema compatibility, and real session identity are separate requirements. Current registration checks presence and Settings has no verify action. Updating a skill removes the destination before copying. See [integration UI](src/integrations/AgentIntegrations.svelte), [config](src-tauri/src/integrations/config.rs), [skills](src-tauri/src/integrations/skills.rs), [README](README.md), [bundled skill](src-tauri/resources/skills/sideglance/SKILL.md).
 
 **User story:** As a new or upgrading user, I want to prove my chosen harness can publish a status using its real session ID, so that I know reporting is ready.
 

@@ -13,7 +13,7 @@ pub(crate) fn restore_native_frame(window: &tauri::WebviewWindow) -> tauri::Resu
         // Tauri owns this NSWindow. The borrowed pointer is used only on the
         // main thread while its WebviewWindow is alive.
         let native = unsafe { &*window.ns_window()?.cast::<NSWindow>() };
-        let name = NSString::from_str(&format!("ctx-ppteer.{}", window.label()));
+        let name = NSString::from_str(&format!("sideglance.{}", window.label()));
         // Restore before enabling autosave so the initial frame cannot replace
         // the saved one. AppKit handles persistence and screen adjustment.
         native.setFrameUsingName(&name);
@@ -53,7 +53,7 @@ pub(crate) fn show_settings_window(app: &AppHandle) {
             "settings",
             WebviewUrl::App("index.html#/settings".into()),
         )
-        .title("ctx-ppteer Settings")
+        .title("Sideglance Settings")
         .inner_size(520.0, 430.0)
         .min_inner_size(420.0, 360.0)
         .resizable(true)

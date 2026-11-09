@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ctx-ppteer",
+  "productName": "Sideglance",
   "version": "../package.json",
-  "identifier": "dev.vivekraman.ctxppteer",
+  "identifier": "dev.vivekraman.sideglance",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
       {
         "label": "main",
         "visible": false,
-        "title": "ctx-ppteer",
+        "title": "Sideglance",
         "width": 360,
         "height": 220,
         "minWidth": 260,
@@ -51,7 +51,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "shortDescription": "Agent status viewer",
-    "longDescription": "A lightweight viewer for structured agent status points."
+    "shortDescription": "A desktop status board for coding agents",
+    "longDescription": "Your coding agents, at a glance. Keep agent-reported updates in a compact desktop window, grouped by project and branch."
   }
 }

@@ -206,7 +206,7 @@ pub(crate) fn install_mcp_for_harness(
     app: AppHandle,
 ) -> Result<SkillInstallation, String> {
     let executable = std::env::current_exe()
-        .map_err(|error| format!("Unable to locate the ctx-ppteer executable: {error}"))?;
+        .map_err(|error| format!("Unable to locate the Sideglance executable: {error}"))?;
     let home = paths::home_dir(&app)?;
     if let Some(directory) = harness.strip_prefix("codex:") {
         let directory = PathBuf::from(directory);
@@ -225,7 +225,7 @@ pub(crate) fn install_mcp_for_harness(
     match agent.adapter {
         ConfigAdapter::CodexToml => register_codex_mcp(&config_path(&home, agent), &executable)?,
         ConfigAdapter::ClaudeCli => {
-            if !install_claude_mcp(&executable)? {
+            if !install_claude_mcp(&executable, &config_path(&home, agent))? {
                 return Err(
                     "Claude Code is not installed; its MCP tool was not registered.".into(),
                 );

@@ -100,7 +100,7 @@ pub(crate) fn descriptor(id: &str) -> Option<&'static AgentDescriptor> {
 }
 
 pub(crate) fn skill_path(home: &Path, agent: &AgentDescriptor) -> PathBuf {
-    home.join(agent.skill_directory).join("ctx-ppteer")
+    home.join(agent.skill_directory).join("sideglance")
 }
 
 pub(crate) fn config_path(home: &Path, agent: &AgentDescriptor) -> PathBuf {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ctx-ppteer status document",
+  "title": "Sideglance status document",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "entries"],

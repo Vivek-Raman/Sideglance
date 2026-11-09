@@ -13,7 +13,7 @@ use serde::Deserialize;
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct WriteStatusInput {
-    /// The current project's folder name, such as "ctx-ppteer".
+    /// The current project's folder name, such as "sideglance".
     folder_name: String,
     /// Your stable session ID from the harness.
     session_id: String,
@@ -26,7 +26,7 @@ struct WriteStatusInput {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ReadStatusInput {
-    /// The current project's folder name, such as "ctx-ppteer".
+    /// The current project's folder name, such as "sideglance".
     folder_name: String,
     /// Your stable session ID from the harness.
     session_id: String,
