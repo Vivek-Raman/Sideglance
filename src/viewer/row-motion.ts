@@ -56,6 +56,8 @@ export class RowMotion implements ViewerMotion {
         layout.entries,
         projectNames(layout.entries, layout.settings?.projectSortOrder ?? 'project-directory-asc'),
         layout.settings?.statusSortOrder,
+        layout.settings?.headerTitle,
+        layout.settings?.headerSubtitle,
       ).map(({ key }) => key),
     );
     const exits: Promise<void>[] = [];
@@ -92,9 +94,7 @@ export class RowMotion implements ViewerMotion {
     await this.tick();
     if (this.disposed) return;
 
-    const after = new Map(
-      [...this.rows].map(([key, node]) => [key, node.getBoundingClientRect()]),
-    );
+    const after = new Map([...this.rows].map(([key, node]) => [key, node.getBoundingClientRect()]));
     const resized = [...this.rows].filter(([key]) => {
       const from = before.get(key);
       const to = after.get(key);
@@ -109,9 +109,7 @@ export class RowMotion implements ViewerMotion {
       node.style.height = `${from.height}px`;
       node.style.overflow = 'clip';
     }
-    const start = new Map(
-      [...this.rows].map(([key, node]) => [key, node.getBoundingClientRect()]),
-    );
+    const start = new Map([...this.rows].map(([key, node]) => [key, node.getBoundingClientRect()]));
     const moves: Promise<void>[] = [];
     for (const [key, node] of this.rows) {
       const from = before.get(key);

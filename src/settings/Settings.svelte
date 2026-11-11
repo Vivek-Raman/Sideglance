@@ -44,7 +44,10 @@
     if (!settings) return;
     settingsError = '';
     try {
-      await command('set_header_layout', { headerLayout: settings.headerLayout });
+      await command('set_header_settings', {
+        headerTitle: settings.headerTitle,
+        headerSubtitle: settings.headerSubtitle,
+      });
     } catch (error) {
       settingsError = errorText(error);
     }

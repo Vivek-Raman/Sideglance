@@ -91,7 +91,13 @@ test('header layouts show repository and branch and retain every point', () => {
   const normal = viewerRows(data, ['demo']);
   assert.equal(normal[0].kind === 'project' && normal[0].folder, 'demo');
   assert.equal(normal[1].kind === 'branch' && normal[1].branch, 'owner/repo · main');
-  const flipped = viewerRows(data, ['demo'], 'submitted-at-desc', 'repository-first');
+  const flipped = viewerRows(
+    data,
+    ['demo'],
+    'submitted-at-desc',
+    'repository-branch',
+    'project-directory',
+  );
   assert.equal(flipped[0].kind === 'project' && flipped[0].folder, 'owner/repo · main');
   assert.equal(flipped[1].kind === 'branch' && flipped[1].branch, 'demo');
   assert.equal(flipped.filter((r) => r.kind === 'project').length, 2);
@@ -99,6 +105,36 @@ test('header layouts show repository and branch and retain every point', () => {
     flipped.filter((r) => r.kind === 'point'),
     normal.filter((r) => r.kind === 'point'),
   );
-  const legacy = viewerRows(entries, ['demo'], 'submitted-at-desc', 'repository-first');
+  const legacy = viewerRows(
+    entries,
+    ['demo'],
+    'submitted-at-desc',
+    'repository-branch',
+    'project-directory',
+  );
   assert.equal(legacy[0].kind === 'project' && legacy[0].folder, 'main');
+});
+
+test('title and subtitle are independent, and None omits subtitle rows', () => {
+  const data = entries.map((item) => ({ ...item, repository: 'owner/repo' }));
+  for (const title of ['project-directory', 'repository-branch'] as const) {
+    for (const subtitle of ['project-directory', 'repository-branch', 'none'] as const) {
+      const rows = viewerRows(data, ['demo'], 'submitted-at-desc', title, subtitle);
+      const titles = rows.filter((row) => row.kind === 'project');
+      const subtitles = rows.filter((row) => row.kind === 'branch');
+      assert.equal(titles[0].folder, title === 'project-directory' ? 'demo' : 'owner/repo · main');
+      if (subtitle === 'none') assert.deepEqual(subtitles, []);
+      else {
+        assert.equal(subtitles.length, 2);
+        assert.equal(
+          subtitles[0].branch,
+          subtitle === 'project-directory' ? 'demo' : 'owner/repo · main',
+        );
+      }
+      assert.deepEqual(
+        rows.filter((row) => row.kind === 'point'),
+        viewerRows(data, ['demo']).filter((row) => row.kind === 'point'),
+      );
+    }
+  }
 });

@@ -10,7 +10,10 @@ type CommandMap = {
     args: { theme: Settings['theme']; primaryColor: string; textScale: number };
     result: void;
   };
-  set_header_layout: { args: { headerLayout: Settings['headerLayout'] }; result: void };
+  set_header_settings: {
+    args: { headerTitle: Settings['headerTitle']; headerSubtitle: Settings['headerSubtitle'] };
+    result: void;
+  };
   set_pinned: { args: { pinned: boolean }; result: void };
   set_project_sort_order: {
     args: { projectSortOrder: Settings['projectSortOrder'] };

@@ -47,7 +47,13 @@
     if (!controller.state.undoCount) undoNotice = false;
   }
   $: projects = projectNames(entries, settings?.projectSortOrder ?? 'project-directory-asc');
-  $: rows = viewerRows(entries, projects, settings?.statusSortOrder, settings?.headerLayout);
+  $: rows = viewerRows(
+    entries,
+    projects,
+    settings?.statusSortOrder,
+    settings?.headerTitle,
+    settings?.headerSubtitle,
+  );
   $: countExpiring = countExpiryKeys(entries, settings?.maxStatusItemsPerProject ?? null);
   function safeLink(link: string | null) {
     if (!link) return null;
@@ -295,7 +301,7 @@
   </svg>
   <div class="app-chrome" data-tauri-drag-region aria-hidden="true"></div>
   {#if import.meta.env.DEV}
-    <span class="development-label">Development</span>
+    <span class="development-label">dev</span>
   {/if}
   <div class="document-actions" class:window-unfocused={!windowFocused}>
     <button
@@ -528,13 +534,18 @@
   .development-label {
     position: absolute;
     z-index: 2;
-    top: 42px;
+    top: 18px;
     right: 16px;
+    transform: translateY(-50%);
+    padding: 0.14rem 0.5rem;
     color: var(--muted);
     font-size: 0.65rem;
     letter-spacing: 0.04em;
     pointer-events: none;
     user-select: none;
+  }
+  .development-label + .document-actions {
+    right: 60px;
   }
   .document-actions {
     position: fixed;
@@ -581,6 +592,17 @@
   .status-point.expiring-soon {
     opacity: 0.42;
   }
+  .development-label,
+  .point-actions {
+    border-radius: 999px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(28px) saturate(1.15);
+    -webkit-backdrop-filter: blur(28px) saturate(1.15);
+    box-shadow:
+      0 2px 8px color-mix(in srgb, var(--text) 8%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--bg) 28%, transparent);
+  }
   .point-actions {
     position: absolute;
     top: 50%;
@@ -589,17 +611,9 @@
     align-items: center;
     gap: 0.3rem;
     padding: 0.14rem 0.28rem 0.14rem 0.5rem;
-    border-radius: 999px;
     transform: translateY(-50%);
     opacity: 0;
     pointer-events: none;
-    color: var(--muted);
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: blur(28px) saturate(1.15);
-    -webkit-backdrop-filter: blur(28px) saturate(1.15);
-    box-shadow:
-      0 2px 8px color-mix(in srgb, var(--text) 8%, transparent),
-      inset 0 0 0 1px color-mix(in srgb, var(--bg) 28%, transparent);
     font-size: 0.78em;
     white-space: nowrap;
     transition: opacity 120ms var(--ease-gentle-out);

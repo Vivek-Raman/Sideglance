@@ -1,4 +1,5 @@
-export type HeaderLayout = 'directory-first' | 'repository-first';
+export type HeaderTitle = 'project-directory' | 'repository-branch';
+export type HeaderSubtitle = HeaderTitle | 'none';
 export type Theme = 'system' | 'light' | 'dark';
 export type ProjectSortOrder = 'project-directory-asc' | 'updated-at-desc' | 'updated-at-asc';
 
@@ -57,7 +58,8 @@ export type SkillInstallation = {
 };
 
 export type Settings = {
-  headerLayout: HeaderLayout;
+  headerTitle: HeaderTitle;
+  headerSubtitle: HeaderSubtitle;
   theme: Theme;
   primaryColor: string;
   textScale: number;

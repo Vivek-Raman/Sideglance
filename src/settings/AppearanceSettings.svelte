@@ -12,14 +12,18 @@
     <p>Set the colors, text size, and project headers used in the viewer.</p>
   </div>
   <div class="setting-row">
-    <label for="header-layout">Header layout</label>
-    <select id="header-layout" bind:value={settings.headerLayout} onchange={onHeaderSave}>
-      <option value="directory-first"
-        >Title: project directory · Subtitle: owner/repo + branch</option
-      >
-      <option value="repository-first"
-        >Title: owner/repo + branch · Subtitle: project directory</option
-      >
+    <label for="header-title">Title</label>
+    <select id="header-title" bind:value={settings.headerTitle} onchange={onHeaderSave}>
+      <option value="project-directory">Project directory</option>
+      <option value="repository-branch">Repo owner/repo name + branch</option>
+    </select>
+  </div>
+  <div class="setting-row">
+    <label for="header-subtitle">Subtitle</label>
+    <select id="header-subtitle" bind:value={settings.headerSubtitle} onchange={onHeaderSave}>
+      <option value="repository-branch">Repo owner/repo name + branch</option>
+      <option value="project-directory">Project directory</option>
+      <option value="none">None</option>
     </select>
   </div>
   <div class="setting-row">

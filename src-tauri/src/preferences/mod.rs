@@ -10,10 +10,49 @@ use crate::paths;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
-pub enum HeaderLayout {
+pub enum HeaderTitle {
     #[default]
-    DirectoryFirst,
-    RepositoryFirst,
+    ProjectDirectory,
+    RepositoryBranch,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum HeaderSubtitle {
+    ProjectDirectory,
+    #[default]
+    RepositoryBranch,
+    None,
+}
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HeaderSettings {
+    pub header_title: HeaderTitle,
+    pub header_subtitle: HeaderSubtitle,
+}
+impl<'de> Deserialize<'de> for HeaderSettings {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Input {
+            header_title: Option<HeaderTitle>,
+            header_subtitle: Option<HeaderSubtitle>,
+            header_layout: Option<String>,
+        }
+        let input = Input::deserialize(deserializer)?;
+        let repository_first = input.header_layout.as_deref() == Some("repository-first");
+        Ok(Self {
+            header_title: input.header_title.unwrap_or(if repository_first {
+                HeaderTitle::RepositoryBranch
+            } else {
+                HeaderTitle::ProjectDirectory
+            }),
+            header_subtitle: input.header_subtitle.unwrap_or(if repository_first {
+                HeaderSubtitle::ProjectDirectory
+            } else {
+                HeaderSubtitle::RepositoryBranch
+            }),
+        })
+    }
 }
 
 pub const PROJECT_DIRECTORY_ASC: &str = "project-directory-asc";
@@ -60,8 +99,8 @@ impl StatusSortOrder {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    #[serde(default)]
-    pub header_layout: HeaderLayout,
+    #[serde(flatten)]
+    pub header: HeaderSettings,
     #[serde(default = "default_theme")]
     pub theme: Theme,
     #[serde(default = "default_primary_color")]
@@ -105,7 +144,7 @@ fn default_project_sort_order() -> ProjectSortOrder {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            header_layout: HeaderLayout::default(),
+            header: HeaderSettings::default(),
             theme: default_theme(),
             primary_color: default_primary_color(),
             text_scale: default_text_scale(),
@@ -350,34 +389,35 @@ pub fn settings_owner(app: &AppHandle) -> Result<Arc<SettingsOwner>, String> {
 mod tests {
     use super::*;
     #[test]
-    fn header_layout_defaults_and_persists() {
+    fn header_settings_default_migrate_and_persist() {
+        let defaults: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(defaults.header, HeaderSettings::default());
+        let legacy: Settings =
+            serde_json::from_str(r#"{"headerLayout":"repository-first"}"#).unwrap();
+        assert_eq!(legacy.header.header_title, HeaderTitle::RepositoryBranch);
         assert_eq!(
-            serde_json::from_str::<Settings>("{}")
-                .unwrap()
-                .header_layout,
-            HeaderLayout::DirectoryFirst
+            legacy.header.header_subtitle,
+            HeaderSubtitle::ProjectDirectory
         );
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("settings.json");
         let owner = SettingsOwner::from_path(path.clone()).unwrap();
         owner
             .update(|settings| {
-                settings.header_layout = HeaderLayout::RepositoryFirst;
+                settings.header.header_title = HeaderTitle::RepositoryBranch;
+                settings.header.header_subtitle = HeaderSubtitle::None;
                 Ok(())
             })
             .unwrap();
-        assert_eq!(
-            SettingsOwner::from_path(path)
-                .unwrap()
-                .snapshot()
-                .header_layout,
-            HeaderLayout::RepositoryFirst
-        );
-        assert_eq!(
-            owner.reset().unwrap().header_layout,
-            HeaderLayout::DirectoryFirst
-        );
-        assert!(serde_json::from_str::<HeaderLayout>("\"unknown\"").is_err());
+        let loaded = SettingsOwner::from_path(path).unwrap().snapshot();
+        assert_eq!(loaded.header.header_title, HeaderTitle::RepositoryBranch);
+        assert_eq!(loaded.header.header_subtitle, HeaderSubtitle::None);
+        let json = serde_json::to_string(&loaded).unwrap();
+        assert!(!json.contains("headerLayout"));
+        assert_eq!(serde_json::from_str::<Settings>(&json).unwrap(), loaded);
+        assert_eq!(owner.reset().unwrap().header, HeaderSettings::default());
+        assert!(serde_json::from_str::<Settings>(r#"{"headerTitle":"none"}"#).is_err());
+        assert!(serde_json::from_str::<Settings>(r#"{"headerSubtitle":"unknown"}"#).is_err());
     }
     #[test]
     fn status_sort_defaults_and_round_trips() {

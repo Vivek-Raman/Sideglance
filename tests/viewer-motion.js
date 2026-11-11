@@ -31,7 +31,8 @@ let failDismiss = false;
 let settings = {
   theme: 'light',
   primaryColor: '#c98c5a',
-  headerLayout: 'directory-first',
+  headerTitle: 'project-directory',
+  headerSubtitle: 'repository-branch',
   textScale: 1,
   projectSortOrder: 'project-directory-asc',
   statusSortOrder: 'submitted-at-desc',
@@ -317,6 +318,39 @@ window.motionResults = (async () => {
   );
   results.push({ name: 'update during exit preserves and restores returning rows' });
   await pause(250);
+  const assertHeadersVisible = () => {
+    const headings = [...document.querySelectorAll('.motion-row h2')];
+    assert(headings.length > 0, 'header change removed all titles');
+    for (const heading of headings) {
+      assert(
+        getComputedStyle(heading.closest('.motion-row')).opacity === '1',
+        'header change left a title faded',
+      );
+      assert(
+        getComputedStyle(heading.parentElement).opacity === '1',
+        'header change left title content hidden',
+      );
+    }
+  };
+  settings = { ...settings, headerTitle: 'repository-branch', headerSubtitle: 'none' };
+  emit('settings-update', settings);
+  await pause(850);
+  assertHeadersVisible();
+  assert(!document.querySelector('.motion-row p'), 'None left subtitles visible');
+  // A later settings update must retain the existing repository title rows.
+  settings = { ...settings, textScale: 1 };
+  emit('settings-update', settings);
+  await pause(850);
+  assertHeadersVisible();
+  await push([...entries]);
+  await pause(850);
+  assertHeadersVisible();
+  settings = { ...settings, headerTitle: 'project-directory', headerSubtitle: 'project-directory' };
+  emit('settings-update', settings);
+  await pause(850);
+  assertHeadersVisible();
+  assert(document.querySelector('.motion-row p'), 'subtitle did not return');
+  results.push({ name: 'header titles stay visible across settings and snapshot animations' });
   const matchMedia = window.matchMedia.bind(window);
   window.matchMedia = (query) =>
     query === '(prefers-reduced-motion: reduce)' ? { matches: true } : matchMedia(query);
