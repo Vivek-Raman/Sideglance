@@ -39,6 +39,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "resources": {
       "resources/skills": "skills",
       "resources/Credits.rtf": "Credits.rtf"
@@ -53,5 +57,11 @@
     ],
     "shortDescription": "A desktop status board for coding agents",
     "longDescription": "Your coding agents, at a glance. Keep agent-reported updates in a compact desktop window, grouped by project and branch."
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBENUMzQzlEODYxOTU0MDcKUldRSFZCbUduVHhjRGFiUE1DVERDbXNpUkFqZXF3RnJCTlBkTVJIbzNoMk0rejN3bHNCUjFGV20K",
+      "endpoints": ["https://github.com/Vivek-Raman/sideglance/releases/latest/download/latest.json"]
+    }
   }
 }

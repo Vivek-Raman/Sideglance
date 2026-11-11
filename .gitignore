@@ -1,6 +1,8 @@
 node_modules/
 dist/
 src-tauri/target/
+src-tauri/.sideglance.key
+src-tauri/.sideglance.key.pub
 .DS_Store
 docs/*
 !docs/technical-reference.md

@@ -32,20 +32,22 @@ Use this skill only when explicitly invoked to release this repository. Model in
    Prefer `npm version <new-version> --no-git-tag-version` for the npm files. Update the Cargo manifest, then run a Cargo command that refreshes its lockfile when needed. Do not change dependency versions.
 2. Inspect the diff and run `git diff --check`, `npm run build`, and `cargo check --manifest-path src-tauri/Cargo.toml`. Resolve release-related failures before committing.
 3. Commit only the version changes with `Release v<new-version>`, then push that commit to `origin/main`.
-4. Create the GitHub release with GitHub CLI, targeting the pushed commit and using tag `v<new-version>`. Use generated notes unless the user supplied release notes:
+4. Create and push tag `v<new-version>` for the pushed commit. Do not create a GitHub release directly. The release workflow creates a draft, uploads every signed platform bundle, writes the update manifest, and publishes the release only after all three builds pass.
 
    ```sh
-   gh release create "v<new-version>" --target "$(git rev-parse HEAD)" --title "sideglance v<new-version>" --generate-notes
+   git tag "v<new-version>"
+   git push origin "v<new-version>"
+   gh workflow run "Release Sideglance" --ref main -f "tag=v<new-version>"
    ```
 
 ## Follow through to completion
 
-The release workflow is `.github/workflows/release.yml`; it runs when a release is created and builds macOS, Linux, and Windows bundles.
+The release workflow is `.github/workflows/release.yml`; it is dispatched with the tag and builds macOS, Linux, and Windows bundles before publishing the GitHub release.
 
-1. Find the workflow run associated with the new release, allowing briefly for it to appear, then follow it with `gh run watch <run-id> --exit-status`.
+1. Find the dispatched workflow run associated with the tag, allowing briefly for it to appear, then follow it with `gh run watch <run-id> --exit-status`.
 2. Treat the release as successful only when all workflow jobs have succeeded and `gh release view v<new-version> --json isDraft,url,assets` confirms a published (non-draft) release with uploaded assets. Report the release URL and run URL.
 3. If the run fails, inspect `gh run view <run-id> --log-failed` and the failed job metadata, diagnose the cause, and fix issues that are clearly in scope.
    - For a transient infrastructure failure, rerun the failed jobs with `gh run rerun <run-id> --failed`, then watch and verify again.
-   - For a source fix, commit and push the correction. The existing release tag still points to the old commit, so do not claim that new commit has fixed the current release.
-   - Never force-move a tag or delete/replace a release. Explain the failure and ask the user for approval of a new release version and publication plan before making a corrective release.
+   - For a source fix, commit and push the correction. The existing tag points to the old commit, so do not claim that new commit has fixed the current release.
+   - A draft that failed before publication may be deleted and recreated for the same tag after fixing the workflow or re-running transient jobs. Never change a published release or force-move a tag. Explain the failure and ask the user for approval of a new release version and publication plan before a corrective published release.
 4. Continue the check/fix/retry cycle until verified success or until a user decision is required. Do not report success from a release creation command alone.
