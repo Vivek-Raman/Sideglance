@@ -294,6 +294,9 @@
     </g>
   </svg>
   <div class="app-chrome" data-tauri-drag-region aria-hidden="true"></div>
+  {#if import.meta.env.DEV}
+    <span class="development-label">Development</span>
+  {/if}
   <div class="document-actions" class:window-unfocused={!windowFocused}>
     <button
       class="icon-button"
@@ -521,6 +524,17 @@
     .undo-countdown {
       animation: none;
     }
+  }
+  .development-label {
+    position: absolute;
+    z-index: 2;
+    top: 42px;
+    right: 16px;
+    color: var(--muted);
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    user-select: none;
   }
   .document-actions {
     position: fixed;
