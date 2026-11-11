@@ -114,6 +114,18 @@ pub(crate) fn set_appearance_settings(
 }
 
 #[tauri::command]
+pub(crate) fn set_header_layout(
+    header_layout: crate::preferences::HeaderLayout,
+    owner: State<'_, Arc<SettingsOwner>>,
+) -> Result<(), String> {
+    owner.update(|settings| {
+        settings.header_layout = header_layout;
+        Ok(())
+    })?;
+    Ok(())
+}
+
+#[tauri::command]
 pub(crate) fn set_project_sort_order(
     project_sort_order: String,
     owner: State<'_, Arc<SettingsOwner>>,

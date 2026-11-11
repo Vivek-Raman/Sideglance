@@ -40,6 +40,15 @@
       saving = false;
     }
   }
+  async function saveHeaderLayout() {
+    if (!settings) return;
+    settingsError = '';
+    try {
+      await command('set_header_layout', { headerLayout: settings.headerLayout });
+    } catch (error) {
+      settingsError = errorText(error);
+    }
+  }
   async function saveUndoLimit(value: number) {
     if (!Number.isInteger(value) || value < 1 || value > 100) {
       settingsError = 'Undo history must be between 1 and 100 items';
@@ -143,7 +152,12 @@
     <p>Choose what Sideglance shows and how it appears.</p>
   </header>
   {#if settings}
-    <AppearanceSettings {settings} {primaryColors} onSave={() => void saveAppearanceSettings()} />
+    <AppearanceSettings
+      {settings}
+      {primaryColors}
+      onHeaderSave={() => void saveHeaderLayout()}
+      onSave={() => void saveAppearanceSettings()}
+    />
     <section class="settings-group">
       <div class="group-heading">
         <h2>Viewer</h2>

@@ -8,6 +8,14 @@ use tauri::{AppHandle, Emitter};
 
 use crate::paths;
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum HeaderLayout {
+    #[default]
+    DirectoryFirst,
+    RepositoryFirst,
+}
+
 pub const PROJECT_DIRECTORY_ASC: &str = "project-directory-asc";
 pub const UPDATED_AT_DESC: &str = "updated-at-desc";
 pub const UPDATED_AT_ASC: &str = "updated-at-asc";
@@ -52,6 +60,8 @@ impl StatusSortOrder {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    #[serde(default)]
+    pub header_layout: HeaderLayout,
     #[serde(default = "default_theme")]
     pub theme: Theme,
     #[serde(default = "default_primary_color")]
@@ -95,6 +105,7 @@ fn default_project_sort_order() -> ProjectSortOrder {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            header_layout: HeaderLayout::default(),
             theme: default_theme(),
             primary_color: default_primary_color(),
             text_scale: default_text_scale(),
@@ -338,6 +349,36 @@ pub fn settings_owner(app: &AppHandle) -> Result<Arc<SettingsOwner>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn header_layout_defaults_and_persists() {
+        assert_eq!(
+            serde_json::from_str::<Settings>("{}")
+                .unwrap()
+                .header_layout,
+            HeaderLayout::DirectoryFirst
+        );
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        let owner = SettingsOwner::from_path(path.clone()).unwrap();
+        owner
+            .update(|settings| {
+                settings.header_layout = HeaderLayout::RepositoryFirst;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            SettingsOwner::from_path(path)
+                .unwrap()
+                .snapshot()
+                .header_layout,
+            HeaderLayout::RepositoryFirst
+        );
+        assert_eq!(
+            owner.reset().unwrap().header_layout,
+            HeaderLayout::DirectoryFirst
+        );
+        assert!(serde_json::from_str::<HeaderLayout>("\"unknown\"").is_err());
+    }
     #[test]
     fn status_sort_defaults_and_round_trips() {
         let settings: Settings = serde_json::from_str("{}").unwrap();

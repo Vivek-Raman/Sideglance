@@ -19,6 +19,8 @@ pub struct Point {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Entry {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
     pub folder_name: String,
     pub session_id: Option<String>,
     pub branch: String,
@@ -50,7 +52,11 @@ pub fn validate(document: &Document) -> Result<(), String> {
     }
     let mut keys = HashSet::new();
     for entry in &document.entries {
-        if !single_line(&entry.folder_name)
+        if entry
+            .repository
+            .as_ref()
+            .is_some_and(|repo| !single_line(repo))
+            || !single_line(&entry.folder_name)
             || !single_line(&entry.branch)
             || entry.session_id.as_ref().is_some_and(|id| !single_line(id))
             || entry.points.is_empty()
@@ -130,6 +136,7 @@ pub fn assign_legacy_ids(document: &mut Document) {
         .collect();
     for entry in &mut document.entries {
         let metadata = Entry {
+            repository: None,
             folder_name: entry.folder_name.clone(),
             session_id: entry.session_id.clone(),
             branch: entry.branch.clone(),
@@ -218,6 +225,7 @@ pub fn upsert(
         }
     }
     let entry = Entry {
+        repository: None,
         folder_name: folder,
         session_id: Some(session),
         branch,

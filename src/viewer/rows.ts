@@ -1,4 +1,4 @@
-import type { StatusEntry, StatusPoint, StatusSortOrder } from '../shared/types';
+import type { StatusEntry, StatusPoint, StatusSortOrder, HeaderLayout } from '../shared/types';
 
 type Row =
   | { key: string; kind: 'project'; folder: string }
@@ -43,12 +43,31 @@ export function viewerRows(
   entries: StatusEntry[],
   projects: string[],
   order: StatusSortOrder = 'submitted-at-desc',
+  layout: HeaderLayout = 'directory-first',
 ): Row[] {
   return projects.flatMap((folder) => {
     const projectEntries = entries.filter((entry) => entry.folder_name === folder);
-    const rows: Row[] = [{ key: JSON.stringify(['project', folder]), kind: 'project', folder }];
+    const rows: Row[] =
+      layout === 'directory-first'
+        ? [{ key: JSON.stringify(['project', folder]), kind: 'project', folder }]
+        : [];
     for (const branch of new Set(projectEntries.map((entry) => entry.branch))) {
-      rows.push({ key: JSON.stringify(['branch', folder, branch]), kind: 'branch', branch });
+      const repository = projectEntries.find(
+        (entry) => entry.branch === branch && entry.repository,
+      )?.repository;
+      const label = repository ? `${repository} · ${branch}` : branch;
+      if (layout === 'repository-first') {
+        rows.push({
+          key: JSON.stringify(['project', folder, branch]),
+          kind: 'project',
+          folder: label,
+        });
+      }
+      rows.push({
+        key: JSON.stringify(['branch', folder, branch]),
+        kind: 'branch',
+        branch: layout === 'directory-first' ? label : folder,
+      });
       const points = projectEntries
         .filter((entry) => entry.branch === branch)
         .flatMap((entry) =>

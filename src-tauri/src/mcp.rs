@@ -13,6 +13,8 @@ use serde::Deserialize;
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct WriteStatusInput {
+    /// Repository owner/name from the Git remote, such as "owner/repo".
+    repository: Option<String>,
     /// The current project's folder name, such as "sideglance".
     folder_name: String,
     /// Your stable session ID from the harness.
@@ -81,11 +83,12 @@ impl StatusServer {
     ) -> Result<String, McpError> {
         let path = paths::status_path().map_err(|error| McpError::internal_error(error, None))?;
         let bytes = StatusStore::new(path)
-            .upsert(
+            .upsert_with_repository(
                 input.folder_name.clone(),
                 input.session_id,
                 input.branch,
                 input.points,
+                input.repository,
             )
             .map_err(|error| map_status_error(error))?;
         Ok(format!(

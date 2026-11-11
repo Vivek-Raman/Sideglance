@@ -6,6 +6,7 @@ import type { Settings, Snapshot, StatusEntry } from '../src/shared/types.ts';
 const settings: Settings = {
   theme: 'light',
   primaryColor: '#c98c5a',
+  headerLayout: 'directory-first',
   textScale: 1,
   pinned: true,
   projectSortOrder: 'project-directory-asc',

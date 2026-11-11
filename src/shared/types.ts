@@ -1,3 +1,4 @@
+export type HeaderLayout = 'directory-first' | 'repository-first';
 export type Theme = 'system' | 'light' | 'dark';
 export type ProjectSortOrder = 'project-directory-asc' | 'updated-at-desc' | 'updated-at-asc';
 
@@ -11,6 +12,7 @@ export type StatusPoint = {
   id?: string | null;
 };
 export type StatusEntry = {
+  repository?: string | null;
   folder_name: string;
   session_id: string | null;
   branch: string;
@@ -55,6 +57,7 @@ export type SkillInstallation = {
 };
 
 export type Settings = {
+  headerLayout: HeaderLayout;
   theme: Theme;
   primaryColor: string;
   textScale: number;

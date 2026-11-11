@@ -85,3 +85,20 @@ test('count fade includes pending overflow and follows backend tie order with ti
   );
   assert.deepEqual(tied, before);
 });
+
+test('header layouts show repository and branch and retain every point', () => {
+  const data = entries.map((item) => ({ ...item, repository: 'owner/repo' }));
+  const normal = viewerRows(data, ['demo']);
+  assert.equal(normal[0].kind === 'project' && normal[0].folder, 'demo');
+  assert.equal(normal[1].kind === 'branch' && normal[1].branch, 'owner/repo · main');
+  const flipped = viewerRows(data, ['demo'], 'submitted-at-desc', 'repository-first');
+  assert.equal(flipped[0].kind === 'project' && flipped[0].folder, 'owner/repo · main');
+  assert.equal(flipped[1].kind === 'branch' && flipped[1].branch, 'demo');
+  assert.equal(flipped.filter((r) => r.kind === 'project').length, 2);
+  assert.deepEqual(
+    flipped.filter((r) => r.kind === 'point'),
+    normal.filter((r) => r.kind === 'point'),
+  );
+  const legacy = viewerRows(entries, ['demo'], 'submitted-at-desc', 'repository-first');
+  assert.equal(legacy[0].kind === 'project' && legacy[0].folder, 'main');
+});

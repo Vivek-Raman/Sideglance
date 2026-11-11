@@ -47,7 +47,7 @@
     if (!controller.state.undoCount) undoNotice = false;
   }
   $: projects = projectNames(entries, settings?.projectSortOrder ?? 'project-directory-asc');
-  $: rows = viewerRows(entries, projects, settings?.statusSortOrder);
+  $: rows = viewerRows(entries, projects, settings?.statusSortOrder, settings?.headerLayout);
   $: countExpiring = countExpiryKeys(entries, settings?.maxStatusItemsPerProject ?? null);
   function safeLink(link: string | null) {
     if (!link) return null;

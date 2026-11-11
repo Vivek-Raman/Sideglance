@@ -15,6 +15,7 @@ Pass these structured arguments:
 
 - `folder_name`: the current project folder name, unchanged.
 - `session_id`: your actual session or thread ID from the harness context or a documented harness environment variable. Reuse that exact ID for the whole session. For Codex, use `CODEX_THREAD_ID` if supplied. Do not substitute a timestamp, random UUID, process ID, branch, project name, or an unrelated ID. If child agents share a thread ID, include their actual harness-provided agent ID in a stable `thread-id/agent-id` value. Both tools require this ID. If no real ID is exposed, skip status updates and continue the task; never invent an ID.
+- `repository`: when writing, supply the Git remote repository as owner/name, such as "openai/codex". Read it with `git remote get-url origin` and remove the host and trailing `.git`. Omit it if no remote is available. This supplies the repository label in project headers.
 - `branch`: the currently checked out branch in the active working directory. Refresh it before each write; use `detached HEAD` when no branch is checked out.
 - `points`: a list of plain-text objects, usually one brief point. Each has `text`, optional `done` defaulting to false, and optional `link` with an HTTP or HTTPS URL. Use `done: true` for completion; the viewer adds the bold DONE prefix. For PR reviews, use `text: "Reviewing PR #123."` and the canonical PR URL in `link`.
 

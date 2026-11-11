@@ -2,13 +2,25 @@
   import type { Settings } from '../shared/types';
   export let settings: Settings;
   export let primaryColors: { name: string; value: string }[] = [];
+  export let onHeaderSave: () => void;
   export let onSave: () => void;
 </script>
 
 <section class="settings-group appearance">
   <div class="group-heading">
     <h2>Appearance</h2>
-    <p>Set the colors and text size used in the viewer.</p>
+    <p>Set the colors, text size, and project headers used in the viewer.</p>
+  </div>
+  <div class="setting-row">
+    <label for="header-layout">Header layout</label>
+    <select id="header-layout" bind:value={settings.headerLayout} onchange={onHeaderSave}>
+      <option value="directory-first"
+        >Title: project directory · Subtitle: owner/repo + branch</option
+      >
+      <option value="repository-first"
+        >Title: owner/repo + branch · Subtitle: project directory</option
+      >
+    </select>
   </div>
   <div class="setting-row">
     <label for="theme">Theme</label><select id="theme" bind:value={settings.theme} onchange={onSave}

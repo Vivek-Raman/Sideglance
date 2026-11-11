@@ -25,6 +25,25 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
+      - name: Add installation instructions to release notes
+        id: release-notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { owner, repo } = context.repo;
+            const release_id = context.payload.release.id;
+            const { data: release } = await github.rest.repos.getRelease({ owner, repo, release_id });
+            const instructions = fs.readFileSync('.github/RELEASE_TEMPLATE.md', 'utf8').trim();
+            const existing = release.body || '';
+            const body = existing.includes('## Installing on macOS')
+              ? existing
+              : [existing.trim(), instructions].filter(Boolean).join('\n\n');
+            if (body !== existing) {
+              await github.rest.repos.updateRelease({ owner, repo, release_id, body });
+            }
+            core.setOutput('body', body);
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -66,6 +85,6 @@ jobs:
           tagName: ${{ github.event.release.tag_name }}
           releaseId: ${{ github.event.release.id }}
           releaseName: Sideglance ${{ github.event.release.tag_name }}
-          releaseBody: ${{ github.event.release.body }}
+          releaseBody: ${{ steps.release-notes.outputs.body }}
           releaseDraft: false
           prerelease: ${{ github.event.release.prerelease }}

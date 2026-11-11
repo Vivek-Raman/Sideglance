@@ -142,6 +142,16 @@ impl StatusStore {
         branch: String,
         points: Vec<Point>,
     ) -> Result<usize, StatusError> {
+        self.upsert_with_repository(folder, session, branch, points, None)
+    }
+    pub fn upsert_with_repository(
+        &self,
+        folder: String,
+        session: String,
+        branch: String,
+        points: Vec<Point>,
+        repository: Option<String>,
+    ) -> Result<usize, StatusError> {
         let _lock = self.lock()?;
         if !domain::single_line(&folder)
             || !domain::single_line(&session)
@@ -152,8 +162,23 @@ impl StatusStore {
             ));
         }
         let mut document = self.read_unlocked()?;
+        let repository = repository.or_else(|| {
+            document
+                .entries
+                .iter()
+                .find(|e| e.folder_name == folder && e.session_id.as_deref() == Some(&session))
+                .and_then(|e| e.repository.clone())
+        });
+        let identity = (folder.clone(), session.clone());
         domain::upsert(&mut document, folder, session, branch, points, Utc::now())
             .map_err(StatusError::InvalidInput)?;
+        if let Some(entry) = document
+            .entries
+            .iter_mut()
+            .find(|e| e.folder_name == identity.0 && e.session_id.as_deref() == Some(&identity.1))
+        {
+            entry.repository = repository;
+        }
         domain::validate(&document).map_err(StatusError::InvalidDocument)?;
         self.save_unlocked(&document)
     }
@@ -619,6 +644,7 @@ mod tests {
         let document = Document {
             version: 2,
             entries: vec![Entry {
+                repository: None,
                 folder_name: "p".into(),
                 session_id: Some("a".into()),
                 branch: "main".into(),

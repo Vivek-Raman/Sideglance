@@ -31,6 +31,7 @@ let failDismiss = false;
 let settings = {
   theme: 'light',
   primaryColor: '#c98c5a',
+  headerLayout: 'directory-first',
   textScale: 1,
   projectSortOrder: 'project-directory-asc',
   statusSortOrder: 'submitted-at-desc',
@@ -152,10 +153,9 @@ window.motionResults = (async () => {
                 itemPoint.text === 'Alpha point 1'
                   ? {
                       ...itemPoint,
-                      text:
-                        'Alpha point 1 now has enough text to wrap onto another line in the viewer. '.repeat(
-                          4,
-                        ),
+                      text: 'Alpha point 1 now has enough text to wrap onto another line in the viewer. '.repeat(
+                        4,
+                      ),
                     }
                   : itemPoint,
               ),

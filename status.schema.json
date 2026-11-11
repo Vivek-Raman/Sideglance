@@ -18,14 +18,22 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "version": { "const": 2 } } },
+      "if": {
+        "properties": {
+          "version": {
+            "const": 2
+          }
+        }
+      },
       "then": {
         "properties": {
           "entries": {
             "items": {
               "properties": {
                 "points": {
-                  "items": { "required": ["id"] }
+                  "items": {
+                    "required": ["id"]
+                  }
                 }
               }
             }
@@ -67,6 +75,16 @@
         "updated_at": {
           "type": "string",
           "format": "date-time"
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/line"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
