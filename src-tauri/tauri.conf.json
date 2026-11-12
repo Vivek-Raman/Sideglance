@@ -21,6 +21,7 @@
         "minHeight": 120,
         "resizable": true,
         "alwaysOnTop": true,
+        "backgroundThrottling": "disabled",
         "decorations": true,
         "hiddenTitle": true,
         "acceptFirstMouse": true,

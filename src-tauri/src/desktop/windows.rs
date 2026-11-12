@@ -57,6 +57,8 @@ pub(crate) fn show_settings_window(app: &AppHandle) {
         .inner_size(960.0, 720.0)
         .min_inner_size(720.0, 500.0)
         .resizable(true)
+        // Keep settings and appearance events flowing while another app is focused.
+        .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
         .center()
         .visible(false)
         .build()?;
