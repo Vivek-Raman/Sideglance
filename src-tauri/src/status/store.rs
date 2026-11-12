@@ -157,6 +157,17 @@ impl StatusStore {
         points: Vec<Point>,
         repository: Option<String>,
     ) -> Result<usize, StatusError> {
+        self.upsert_with_repository_result(folder, session, branch, points, repository)
+            .map(|(bytes, _)| bytes)
+    }
+    pub fn upsert_with_repository_result(
+        &self,
+        folder: String,
+        session: String,
+        branch: String,
+        points: Vec<Point>,
+        repository: Option<String>,
+    ) -> Result<(usize, Vec<Point>), StatusError> {
         let _lock = self.lock()?;
         if !domain::single_line(&folder)
             || !domain::single_line(&session)
@@ -185,7 +196,23 @@ impl StatusStore {
             entry.repository = repository;
         }
         domain::validate(&document).map_err(StatusError::InvalidDocument)?;
-        self.save_unlocked(&document)
+        let points = document
+            .entries
+            .iter()
+            .find(|entry| {
+                entry.folder_name == identity.0 && entry.session_id.as_deref() == Some(&identity.1)
+            })
+            .map(|entry| {
+                entry
+                    .points
+                    .iter()
+                    .filter(|point| !point.pinned)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        let bytes = self.save_unlocked(&document)?;
+        Ok((bytes, points))
     }
     pub fn set_point_pinned(
         &self,

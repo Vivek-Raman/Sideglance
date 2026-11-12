@@ -5,29 +5,18 @@ description: MUST ALWAYS invoke this skill for every task to keep Sideglance's s
 
 # Sideglance
 
-The installed skill and MCP server are named `sideglance`.
+Update quietly at task start and when activity or outcome materially changes. Use the `sideglance` MCP; never access its backing file directly.
 
-Update your submission at the start of each task and whenever the activity or outcome materially changes. Read your existing record with `read_status` before writing changes with `write_status`. Make these updates quietly unless the user asks about them or an error requires user action.
+Use the current folder name and actual harness session/thread ID for both tools. For Codex, use `CODEX_THREAD_ID` when supplied. Never invent an ID. If none is exposed, skip updates. Children sharing a thread ID append their actual harness agent ID as `thread-id/agent-id`.
 
-The MCP owns the JSON file, directory creation, locking, and atomic updates. Do not read or edit the backing file directly. No source file configuration is needed.
+Read with `read_status` at session start or after losing the saved points from context. Otherwise reuse the points returned by the last successful write.
 
-Pass these structured arguments:
+Write with `write_status`:
+- `folder_name` and `session_id`: the same project/session identity.
+- `branch`: refresh from Git before writing; use `detached HEAD` when detached.
+- `repository`: supply Git origin as `owner/repo` on the first write, or when it changes. Omit if unavailable; later writes preserve it.
+- `points`: the complete revised list. Each point has `text`, optional `done` and HTTP(S) `link`, and an `id` for existing points. Preserve returned IDs; omit IDs for new points. Writes return saved points with assigned IDs.
 
-- `folder_name`: the current project folder name, unchanged.
-- `session_id`: your actual session or thread ID from the harness context or a documented harness environment variable. Reuse that exact ID for the whole session. For Codex, use `CODEX_THREAD_ID` if supplied. Do not substitute a timestamp, random UUID, process ID, branch, project name, or an unrelated ID. If child agents share a thread ID, include their actual harness-provided agent ID in a stable `thread-id/agent-id` value. Both tools require this ID. If no real ID is exposed, skip status updates and continue the task; never invent an ID.
-- `repository`: when writing, supply the Git remote repository as owner/name, such as "openai/codex". Read it with `git remote get-url origin` and remove the host and trailing `.git`. Omit it if no remote is available. This supplies the repository label in project headers.
-- `branch`: the currently checked out branch in the active working directory. Refresh it before each write; use `detached HEAD` when no branch is checked out.
-- `points`: a list of plain-text objects, usually one brief point. Each has `text`, optional `done` defaulting to false, and optional `link` with an HTTP or HTTPS URL. Use `done: true` for completion; the viewer adds the bold DONE prefix. For PR reviews, use `text: "Reviewing PR #123."` and the canonical PR URL in `link`.
+Revise points rather than accumulate a message history. Keep useful independent work, remove obsolete points, and mark completion with `done: true`. Omitted points are removed. Skip unchanged writes.
 
-Use `folder_name` and your real `session_id` for both tools. Include `branch` and `points` when writing.
-
-With your real `session_id`, call `read_status` with that ID and `folder_name` to retrieve your submitted record. If one exists, revise its points: edit text as work changes, correct earlier claims, mark completed work with `done: true`, and remove points that are obsolete. Preserve your other points only while they remain useful. Add a point for distinct work, not for every progress message. If no record exists, create your initial points.
-
-Call `write_status` with the same project/session ID, the current branch, and your complete revised `points` list. It replaces your earlier submission, so omitted points disappear. For example, change "Investigating concurrent writes." to "Concurrent writes fixed and verified." in the existing point and mark it done rather than retaining both versions. Do not resend an unchanged record.
-
-Keep this as an editable account of your current work, not a message history.
-
-Keep text brief. Do not send Markdown syntax, commit hashes, or other revision identifiers in point text. Mention blockers only when critical and unresolved.
-
-Status points have stable IDs. Version 1 status files remain readable and migrate to version 2 on a successful write. Restart the app after external settings edits.
-When revising points returned by `read_status`, preserve each returned point `id`; do not invent IDs. New points receive IDs from the server.
+Keep points brief and plain text, without Markdown or commit hashes. Usually one point is enough. For PR work, attach the canonical PR URL as `link`. Mention blockers only when critical and unresolved.
