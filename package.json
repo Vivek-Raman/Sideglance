@@ -24,6 +24,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-updater": "^2.14.1",
+    "dompurify": "^3.4.17",
+    "marked": "^18.2.0",
     "svelte": "^5.0.0",
     "svelte-spa-router": "^5.1.1"
   },
