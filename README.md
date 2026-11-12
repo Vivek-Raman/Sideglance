@@ -8,7 +8,7 @@ Running agents across several projects means checking several conversations for 
 
 Pin it above your editor. See what agents are working on, what they've reported complete, and follow links to related work.
 
-[Download the latest release](https://github.com/Vivek-Raman/sideglance/releases/latest) · [Setup and technical reference](docs/technical-reference.md) · [Report an issue](https://github.com/Vivek-Raman/sideglance/issues)
+[Download the latest release](https://github.com/Vivek-Raman/Sideglance/releases/latest) · [Setup and technical reference](docs/technical-reference.md) · [Report an issue](https://github.com/Vivek-Raman/Sideglance/issues)
 
 ## Keep the work in view
 
@@ -22,7 +22,7 @@ Status data stays on your machine. The bundled MCP server receives reports even 
 
 ## Get started
 
-1. Download a desktop bundle for your platform from [Releases](https://github.com/Vivek-Raman/sideglance/releases). Release builds target macOS, Windows, and Linux.
+1. Download a desktop bundle for your platform from [Releases](https://github.com/Vivek-Raman/Sideglance/releases). Release builds target macOS, Windows, and Linux.
 2. Install and open Sideglance, then open **Settings → Agent integration**.
 3. Install the bundled skill and configure MCP for your agent. Codex and Claude Code both have setup support for these two steps.
 4. Restart your agent client if needed to load its new configuration, then start a fresh conversation.
