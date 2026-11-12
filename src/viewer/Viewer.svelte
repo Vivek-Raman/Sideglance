@@ -428,7 +428,11 @@
       >
         <div class="row-content">
           {#if row.kind !== 'point'}
-            <div class="group-heading" class:is-hovered={hoveredHeadings.has(row.key)}>
+            <div
+              class="group-heading"
+              class:project-heading={row.kind === 'project'}
+              class:is-hovered={hoveredHeadings.has(row.key)}
+            >
               {#if row.kind === 'project'}
                 <h2>{row.folder}</h2>
               {:else}
@@ -567,8 +571,9 @@
   }
   .group-heading {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.3rem;
+    margin-bottom: 0.7em;
   }
   .group-heading h2,
   .group-heading p {
@@ -576,7 +581,6 @@
     overflow-wrap: anywhere;
   }
   .collapse-toggle {
-    align-self: center;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -622,14 +626,17 @@
       transition: none;
     }
   }
-  .motion-row h2 {
-    margin: 0 0 0.2em;
+  .group-heading.project-heading {
+    margin-bottom: 0.2em;
   }
-  .motion-row + .motion-row h2 {
+  .motion-row + .motion-row .project-heading {
     margin-top: 0.8em;
   }
+  .group-heading h2,
+  .group-heading p {
+    margin: 0;
+  }
   .motion-row p {
-    margin: 0 0 0.7em;
     color: var(--muted);
   }
   .motion-row ul {
