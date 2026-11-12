@@ -8,18 +8,23 @@ description: Create and verify a major or minor GitHub release for sideglance, w
 
 Use this skill only when explicitly invoked to release this repository. Model invocation is disabled.
 
-## Decide the version
+## Preflight before confirmation
 
-1. Read the current version from `package.json`, `package-lock.json`, and `src-tauri/Cargo.toml`. They must agree before continuing.
-2. The user must choose a **major** or **minor** SemVer bump. If their invocation does not clearly choose one, ask which bump they want and do nothing else that changes repository or GitHub state.
-3. Compute the new version (`major`: `X.0.0`; `minor`: `X.Y.0`) and present both values, for example: `0.1.3 → 0.2.0`.
-4. Wait for an unambiguous user go-ahead before editing files, committing, pushing, tagging, or creating a release. A confirmation from an earlier release attempt does not apply after the version or target commit changes.
+Complete read-only checks before asking the user to choose or approve anything. Do not edit files, stash work, switch branches, update local branches, commit, push, tag, or create a release yet.
 
-## Preflight after approval
+- Check the current branch, upstream, working tree, GitHub CLI authentication, remote repository, and default branch. Release from `main` only. Inspect `origin/main` on GitHub and compare its commit with local `main` to identify a needed update or divergence without changing local state.
+- Read the version from `package.json`, `package-lock.json`, and `src-tauri/Cargo.toml` at the intended release base on `origin/main`. They must agree. Report any differences from the local checkout so the version choices describe what will actually be released.
+- Compute the major and minor candidates. If the invocation already selects a bump or exact version, use that candidate; otherwise present both, for example `2.1.0 → 2.2.0` and `2.1.0 → 3.0.0`.
+- Check each offered `v<version>` tag locally and remotely and its GitHub release. Do not offer an existing tag or release as available, and never overwrite, retag, or delete one.
+- Gather all issues in this pass, including uncommitted files, a different current branch, divergence, version disagreement, authentication failures, and unavailable candidates. Present safe resolutions where possible. Do not silently include or discard unrelated work.
 
-- Recheck the current branch, upstream, working tree, GitHub CLI authentication, and remote repository. Stop and report any issue that could release unrelated or uncommitted work.
-- Release from the repository's default branch (`main`) only. Update it from `origin/main` without overwriting local work; if it has moved or diverged, resolve that before proceeding.
-- Confirm the proposed `v<version>` tag and GitHub release do not already exist. Do not overwrite, retag, or delete an existing release or tag.
+## One combined confirmation
+
+Present one concise request containing the repository, release base commit on `main`, current and proposed versions, preflight results, and all decisions needed to proceed. Include any proposed stash, branch switch, or fast-forward update in that request. If an issue prevents a safe publication plan, report it together with the other findings rather than asking for publication prematurely.
+
+The user must choose a major or minor bump and give an unambiguous go-ahead for publication and the presented resolutions. One reply can authorize all of these. For example: "Publish 2.2.0, stash the listed changes, and update main." Do not ask separately for the version and then for preflight decisions already discoverable above. Honor authorization already given in the invocation or session; ask only for missing decisions.
+
+After confirmation, apply only the agreed resolutions, preserving local work. Recheck the release base, working tree, version, tag, and release availability before preparing the release. Routine execution of the approved plan needs no further confirmation. Stop only for a genuinely new blocker or a material change to the approved version, release base commit, or scope. The release version commit created below is part of the approved plan. Approval from an earlier attempt does not authorize a different version or release base.
 
 ## Prepare and publish
 

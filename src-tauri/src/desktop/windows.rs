@@ -54,8 +54,8 @@ pub(crate) fn show_settings_window(app: &AppHandle) {
             WebviewUrl::App("index.html#/settings".into()),
         )
         .title("Sideglance Settings")
-        .inner_size(520.0, 430.0)
-        .min_inner_size(420.0, 360.0)
+        .inner_size(960.0, 720.0)
+        .min_inner_size(720.0, 500.0)
         .resizable(true)
         .center()
         .visible(false)

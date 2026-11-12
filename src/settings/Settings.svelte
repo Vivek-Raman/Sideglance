@@ -9,6 +9,33 @@
   import RetentionSettings from './RetentionSettings.svelte';
   import UpdateSettings from './UpdateSettings.svelte';
   import AgentIntegrations from '../integrations/AgentIntegrations.svelte';
+  const sections = [
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'viewer', label: 'Viewer' },
+    { id: 'undo', label: 'Undo dismissals' },
+    { id: 'status', label: 'Status' },
+    { id: 'integrations', label: 'Agent integration' },
+    { id: 'updates', label: 'Updates' },
+    { id: 'reset', label: 'Reset settings' },
+  ];
+  let scrollContainer: HTMLElement;
+  let activeSection = 'appearance';
+  function navigateTo(id: string) {
+    const target = scrollContainer.querySelector<HTMLElement>(`[data-section="${id}"]`);
+    if (!target) return;
+    scrollContainer.scrollTop +=
+      target.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top - 28;
+    activeSection = id;
+  }
+  function trackSection() {
+    const top = scrollContainer.getBoundingClientRect().top + 60;
+    let current = sections[0].id;
+    for (const section of sections) {
+      const target = scrollContainer.querySelector(`[data-section="${section.id}"]`);
+      if (target && target.getBoundingClientRect().top <= top) current = section.id;
+    }
+    activeSection = current;
+  }
   let settings: Settings | null = null;
   let saving = false;
   let settingsError = '';
@@ -150,91 +177,160 @@
   });
 </script>
 
-<main class="settings-page">
-  <header>
+<div class="settings-layout">
+  <aside class="settings-sidebar">
     <h1>Settings</h1>
-    <p>Choose what Sideglance shows and how it appears.</p>
-  </header>
-  {#if settings}
-    <AppearanceSettings
-      {settings}
-      {primaryColors}
-      onHeaderSave={() => void saveHeaderLayout()}
-      onSave={() => void saveAppearanceSettings()}
-    />
-    <section class="settings-group">
-      <div class="group-heading">
-        <h2>Viewer</h2>
-        <p>Keep the viewer above other windows.</p>
-      </div>
-      <label class="checkbox"
-        ><input
-          type="checkbox"
-          bind:checked={settings.pinned}
-          onchange={() => void savePinnedSetting(settings!.pinned)}
-        /> Keep viewer always on top</label
-      >
-    </section>
-    <section class="settings-group">
-      <div class="group-heading">
-        <h2>Undo dismissals</h2>
-        <p>Keep the most recent manually dismissed lines for this viewer session.</p>
-      </div>
-      <label
-        >Undo history size
-        <input
-          type="number"
-          min="1"
-          max="100"
-          step="1"
-          value={settings.undoLimit}
-          disabled={saving}
-          onchange={(event) => void saveUndoLimit(Number(event.currentTarget.value))}
-        />
-      </label>
-    </section>
-    <RetentionSettings
-      {settings}
-      {saving}
-      {resetVersion}
-      onSaved={(minutes) => {
-        if (settings) settings.autoClearAfterMinutes = minutes;
-      }}
-      onError={(error) => (settingsError = errorText(error))}
-      onSortChange={() => void saveSortOrder()}
-      onStatusSortChange={() => void saveStatusSortOrder()}
-    />
-    <AgentIntegrations onError={(error) => (integrationsError = errorText(error))} />
-    <UpdateSettings />
-    {#if integrationsError}<p class="error">{integrationsError}</p>{/if}
-    <section class="reset settings-group">
-      <div>
-        <h2>Reset settings</h2>
-        <p>Restore appearance, viewer, and status settings.</p>
-      </div>
-      <button onclick={() => void resetSettings()} disabled={saving}>Reset settings</button>
-    </section>
-    {#if saving}<p class="status">Saving…</p>{/if}{#if settingsError}<p class="error">
-        {settingsError}
-      </p>{/if}
-  {/if}
-</main>
+    <nav aria-label="Settings sections">
+      {#each sections as section}
+        <button
+          class:active={activeSection === section.id}
+          aria-current={activeSection === section.id ? 'location' : undefined}
+          disabled={!settings}
+          onclick={() => navigateTo(section.id)}>{section.label}</button
+        >
+      {/each}
+    </nav>
+  </aside>
+  <main class="settings-page" bind:this={scrollContainer} onscroll={trackSection}>
+    <div class="settings-content">
+      <header>
+        <h2 class="page-title">Preferences</h2>
+        <p>Choose what Sideglance shows and how it appears.</p>
+      </header>
+      {#if settings}
+        <div data-section="appearance">
+          <AppearanceSettings
+            {settings}
+            {primaryColors}
+            onHeaderSave={() => void saveHeaderLayout()}
+            onSave={() => void saveAppearanceSettings()}
+          />
+        </div>
+        <section data-section="viewer" class="settings-group">
+          <div class="group-heading">
+            <h2>Viewer</h2>
+            <p>Keep the viewer above other windows.</p>
+          </div>
+          <label class="checkbox"
+            ><input
+              type="checkbox"
+              bind:checked={settings.pinned}
+              onchange={() => void savePinnedSetting(settings!.pinned)}
+            /> Keep viewer always on top</label
+          >
+        </section>
+        <section data-section="undo" class="settings-group">
+          <div class="group-heading">
+            <h2>Undo dismissals</h2>
+            <p>Keep the most recent manually dismissed lines for this viewer session.</p>
+          </div>
+          <label
+            >Undo history size
+            <input
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              value={settings.undoLimit}
+              disabled={saving}
+              onchange={(event) => void saveUndoLimit(Number(event.currentTarget.value))}
+            />
+          </label>
+        </section>
+        <div data-section="status">
+          <RetentionSettings
+            {settings}
+            {saving}
+            {resetVersion}
+            onSaved={(minutes) => {
+              if (settings) settings.autoClearAfterMinutes = minutes;
+            }}
+            onError={(error) => (settingsError = errorText(error))}
+            onSortChange={() => void saveSortOrder()}
+            onStatusSortChange={() => void saveStatusSortOrder()}
+          />
+        </div>
+        <div data-section="integrations">
+          <AgentIntegrations onError={(error) => (integrationsError = errorText(error))} />
+          {#if integrationsError}<p class="error">{integrationsError}</p>{/if}
+        </div>
+        <div data-section="updates"><UpdateSettings /></div>
+        <section data-section="reset" class="reset settings-group">
+          <div>
+            <h2>Reset settings</h2>
+            <p>Restore appearance, viewer, and status settings.</p>
+          </div>
+          <button onclick={() => void resetSettings()} disabled={saving}>Reset settings</button>
+        </section>
+        {#if saving}<p class="status">Saving…</p>{/if}{#if settingsError}<p class="error">
+            {settingsError}
+          </p>{/if}
+      {/if}
+    </div>
+  </main>
+</div>
 
 <style>
+  .settings-layout {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .settings-sidebar {
+    padding: 28px 14px;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .settings-sidebar h1 {
+    margin: 0 12px 24px;
+    font-size: 1.25rem;
+  }
+  nav {
+    display: grid;
+    gap: 4px;
+  }
+  nav button {
+    padding: 10px 12px;
+    text-align: left;
+    color: var(--muted);
+    background: transparent;
+    border-left: 3px solid transparent;
+    font-weight: 500;
+  }
+  nav button:hover {
+    background: color-mix(in srgb, var(--text) 5%, transparent);
+  }
+  nav button.active {
+    color: var(--text);
+    border-left-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  nav button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
   .settings-page {
     display: block;
-    overflow: auto;
-    padding: 28px;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 28px 32px;
+  }
+  .settings-content {
+    max-width: 820px;
+    margin: 0 auto;
+    padding-bottom: calc(100dvh - 120px);
+  }
+  .settings-page .page-title {
+    font-size: 1.5rem;
   }
   .settings-page header {
     margin-bottom: 28px;
   }
-  .settings-page h1,
   .settings-page h2 {
     margin: 0;
-  }
-  .settings-page h1 {
-    font-size: 1.5rem;
   }
   .settings-page h2 {
     font-size: 1rem;
@@ -291,7 +387,16 @@
   .status {
     color: var(--muted);
   }
-  @media (max-width: 520px) {
+  @media (max-width: 720px) {
+    .settings-layout {
+      grid-template-columns: 155px minmax(0, 1fr);
+    }
+    .settings-sidebar {
+      padding: 20px 8px;
+    }
+    nav button {
+      padding: 10px 8px;
+    }
     .settings-page {
       padding: 20px;
     }
