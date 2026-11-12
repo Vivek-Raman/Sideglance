@@ -1,6 +1,6 @@
 [package]
 name = "sideglance"
-version = "2.4.0"
+version = "2.5.0"
 description = "A desktop status board for coding agents"
 license = "GPL-3.0-only"
 authors = ["Sideglance contributors"]
