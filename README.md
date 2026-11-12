@@ -8,7 +8,7 @@ Running agents across several projects means checking several conversations for 
 
 Pin it above your editor. See what agents are working on, what they've reported complete, and follow links to related work.
 
-[Download the latest release](https://github.com/Vivek-Raman/ctx-ppteer/releases/latest) · [Setup and technical reference](docs/technical-reference.md) · [Report an issue](https://github.com/Vivek-Raman/ctx-ppteer/issues)
+[Download the latest release](https://github.com/Vivek-Raman/Sideglance/releases/latest) · [Setup and technical reference](docs/technical-reference.md) · [Report an issue](https://github.com/Vivek-Raman/Sideglance/issues)
 
 ## Keep the work in view
 
@@ -22,7 +22,7 @@ Status data stays on your machine. The bundled MCP server receives reports even 
 
 ## Get started
 
-1. Download a desktop bundle for your platform from [Releases](https://github.com/Vivek-Raman/ctx-ppteer/releases). Release builds target macOS, Windows, and Linux.
+1. Download a desktop bundle for your platform from [Releases](https://github.com/Vivek-Raman/Sideglance/releases). Release builds target macOS, Windows, and Linux.
 2. Install and open Sideglance, then open **Settings → Agent integration**.
 3. Install the bundled skill and configure MCP for your agent. Codex and Claude Code both have setup support for these two steps.
 4. Restart your agent client if needed to load its new configuration, then start a fresh conversation.
@@ -43,6 +43,12 @@ Sideglance now uses `sideglance` for its executable, skill, MCP registration, an
 Quit the old app and stop its MCP processes before upgrading. Install Sideglance, then install the skill and configure MCP for each client in Settings. Skill installation disables the old skill by backing up its `SKILL.md`; MCP registration replaces the old server key. Restart your agent clients to load the new tools. Update any custom instructions to invoke `sideglance`.
 
 The app identifier has changed, so operating-system window placement and permissions may need to be set again. The GitHub repository and its links retain the old name until the repository is renamed.
+
+## Updates
+
+Select **Check for updates** in Settings to look for a newer stable release. Sideglance downloads and verifies a signed update before installing it. Windows restarts through its installer. macOS and Linux ask you to restart Sideglance after installation.
+
+The first macOS installation still needs the quarantine command in the release notes because Sideglance is not notarized. The updater is designed to avoid repeating that command, but verify this on your macOS version before relying on it. Linux self-updates apply to the AppImage bundle. Installations managed by a package manager should update through that package manager.
 
 ## Development
 

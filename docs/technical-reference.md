@@ -16,6 +16,14 @@ External edits to settings are read at startup. Restart the app after changing `
 
 After upgrading the app, update installed copies of the skill through Settings. Older app and MCP processes cannot read version 2 documents, so upgrade and restart them before the first write. The previous Markdown `status` argument is no longer supported. This project does not migrate a user's status file until a successful write occurs.
 
+## Updates and releases
+
+Settings checks for updates only when the user selects **Check for updates**. The Tauri updater fetches the public `latest.json` asset from the latest stable GitHub release, verifies the update with the public key embedded in `src-tauri/tauri.conf.json`, then installs it after the user selects **Download and install**. The private counterpart is never committed. It must be stored in GitHub Actions secrets as `TAURI_SIGNING_PRIVATE_KEY`, with `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` when the key has one.
+
+`.github/workflows/release.yml` starts when a GitHub release is created. It builds signed macOS arm64, Linux x64, and Windows x64 bundles in parallel. A final job uploads one platform manifest after all three builds pass. Update checks may temporarily fail while a new release builds, because `latest.json` is not available until that final job completes. Linux self-update supports AppImage only. Debian and RPM users should update with their package manager.
+
+The bundled MCP executable is replaced with the app. A running agent client can keep using the old process until it restarts, so users should restart their client after updating. The updater does not replace copied skills or alter agent configuration.
+
 ## Development
 
 Source is organized by responsibility. The frontend keeps app entry points at `src/`, with viewer code in `src/viewer/`, settings in `src/settings/`, integrations in `src/integrations/`, and shared types and Tauri helpers in `src/shared/`. Rust puts status storage and refresh code in `src-tauri/src/status/`, preferences in `preferences/`, desktop commands and windows in `desktop/`, and integration adapters in `integrations/`.

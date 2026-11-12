@@ -32,7 +32,7 @@ Use this skill only when explicitly invoked to release this repository. Model in
    Prefer `npm version <new-version> --no-git-tag-version` for the npm files. Update the Cargo manifest, then run a Cargo command that refreshes its lockfile when needed. Do not change dependency versions.
 2. Inspect the diff and run `git diff --check`, `npm run build`, and `cargo check --manifest-path src-tauri/Cargo.toml`. Resolve release-related failures before committing.
 3. Commit only the version changes with `Release v<new-version>`, then push that commit to `origin/main`.
-4. Create the GitHub release with GitHub CLI, targeting the pushed commit and using tag `v<new-version>`. Use generated notes unless the user supplied release notes:
+4. Create the GitHub release with GitHub CLI, targeting the pushed commit and using tag `v<new-version>`. The release workflow builds every signed platform bundle, then uploads one combined update manifest after the builds pass.
 
    ```sh
    gh release create "v<new-version>" --target "$(git rev-parse HEAD)" --title "sideglance v<new-version>" --generate-notes
@@ -40,12 +40,12 @@ Use this skill only when explicitly invoked to release this repository. Model in
 
 ## Follow through to completion
 
-The release workflow is `.github/workflows/release.yml`; it runs when a release is created and builds macOS, Linux, and Windows bundles.
+The release workflow is `.github/workflows/release.yml`; it starts when a GitHub release is created, builds macOS, Linux, and Windows bundles, then uploads `latest.json` after all build jobs succeed.
 
 1. Find the workflow run associated with the new release, allowing briefly for it to appear, then follow it with `gh run watch <run-id> --exit-status`.
 2. Treat the release as successful only when all workflow jobs have succeeded and `gh release view v<new-version> --json isDraft,url,assets` confirms a published (non-draft) release with uploaded assets. Report the release URL and run URL.
 3. If the run fails, inspect `gh run view <run-id> --log-failed` and the failed job metadata, diagnose the cause, and fix issues that are clearly in scope.
    - For a transient infrastructure failure, rerun the failed jobs with `gh run rerun <run-id> --failed`, then watch and verify again.
-   - For a source fix, commit and push the correction. The existing release tag still points to the old commit, so do not claim that new commit has fixed the current release.
-   - Never force-move a tag or delete/replace a release. Explain the failure and ask the user for approval of a new release version and publication plan before making a corrective release.
+   - For a source fix, commit and push the correction. The existing tag points to the old commit, so do not claim that new commit has fixed the current release.
+   - Never force-move a tag or replace a release. Explain the failure and ask the user for approval of a new release version and publication plan before making a corrective release.
 4. Continue the check/fix/retry cycle until verified success or until a user decision is required. Do not report success from a release creation command alone.

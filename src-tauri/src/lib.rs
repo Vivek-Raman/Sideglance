@@ -14,6 +14,7 @@ pub(crate) const SKILL_NAME: &str = "sideglance";
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             desktop::commands::get_snapshot,
             desktop::commands::dismiss_point,
@@ -34,6 +35,7 @@ pub fn run() {
             desktop::commands::install_mcp_for_harness,
             desktop::commands::uninstall_mcp_for_harness,
             desktop::commands::set_pinned,
+            desktop::commands::restart_app,
         ])
         .setup(|app| {
             install_menu(app)?;

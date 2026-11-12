@@ -7,6 +7,7 @@
   import type { Settings } from '../shared/types';
   import AppearanceSettings from './AppearanceSettings.svelte';
   import RetentionSettings from './RetentionSettings.svelte';
+  import UpdateSettings from './UpdateSettings.svelte';
   import AgentIntegrations from '../integrations/AgentIntegrations.svelte';
   let settings: Settings | null = null;
   let saving = false;
@@ -204,6 +205,7 @@
       onStatusSortChange={() => void saveStatusSortOrder()}
     />
     <AgentIntegrations onError={(error) => (integrationsError = errorText(error))} />
+    <UpdateSettings />
     {#if integrationsError}<p class="error">{integrationsError}</p>{/if}
     <section class="reset settings-group">
       <div>

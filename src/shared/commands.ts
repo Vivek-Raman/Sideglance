@@ -45,6 +45,7 @@ type CommandMap = {
   install_skill_for_target: { args: { target: string }; result: SkillInstallation };
   install_mcp_for_harness: { args: { harness: string }; result: SkillInstallation };
   uninstall_mcp_for_harness: { args: { harness: string }; result: SkillInstallation };
+  restart_app: { args: undefined; result: void };
 };
 
 export function command<K extends keyof CommandMap>(

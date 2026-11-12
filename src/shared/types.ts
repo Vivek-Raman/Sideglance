@@ -70,3 +70,18 @@ export type Settings = {
   maxStatusItemsPerProject: number | null;
   undoLimit: number;
 };
+
+export type UpdateState =
+  | { status: 'idle'; currentVersion: string }
+  | { status: 'checking'; currentVersion: string }
+  | { status: 'up-to-date'; currentVersion: string }
+  | { status: 'available'; currentVersion: string; version: string; notes: string | null }
+  | {
+      status: 'downloading';
+      currentVersion: string;
+      version: string;
+      downloaded: number;
+      contentLength: number | null;
+    }
+  | { status: 'ready-to-restart'; currentVersion: string; version: string }
+  | { status: 'error'; currentVersion: string; message: string };

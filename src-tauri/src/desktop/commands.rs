@@ -190,6 +190,11 @@ pub(crate) fn set_pinned(
 }
 
 #[tauri::command]
+pub(crate) fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
+#[tauri::command]
 pub(crate) fn get_skill_installation(app: AppHandle) -> Result<SkillInstallation, String> {
     integration_status(&app)
 }
