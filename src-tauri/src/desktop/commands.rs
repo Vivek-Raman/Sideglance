@@ -22,6 +22,32 @@ pub(crate) fn get_snapshot(state: State<'_, Arc<ViewerState>>) -> Snapshot {
 }
 
 #[tauri::command]
+pub(crate) fn set_point_pinned(
+    folder_name: String,
+    session_id: Option<String>,
+    branch: String,
+    updated_at: String,
+    point_id: String,
+    pinned: bool,
+    app: AppHandle,
+    state: State<'_, Arc<ViewerState>>,
+) -> Result<(), String> {
+    state
+        .store
+        .set_point_pinned(
+            &folder_name,
+            session_id.as_deref(),
+            &branch,
+            &updated_at,
+            &point_id,
+            pinned,
+        )
+        .map_err(|error| error.to_string())?;
+    update(&app, &state);
+    Ok(())
+}
+
+#[tauri::command]
 pub(crate) fn dismiss_point(
     folder_name: String,
     session_id: Option<String>,

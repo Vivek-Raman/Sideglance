@@ -30,6 +30,17 @@ type CommandMap = {
   set_auto_clear_after_minutes: { args: { autoClearAfterMinutes: number | null }; result: void };
   restore_point: { args: { entry: StatusEntry; pointIndex: number }; result: void };
   set_undo_limit: { args: { undoLimit: number }; result: void };
+  set_point_pinned: {
+    args: {
+      folderName: string;
+      sessionId: string | null;
+      branch: string;
+      updatedAt: string;
+      pointId: string;
+      pinned: boolean;
+    };
+    result: void;
+  };
   dismiss_point: {
     args: {
       folderName: string;

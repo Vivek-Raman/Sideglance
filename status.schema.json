@@ -127,6 +127,10 @@
           "type": "string",
           "minLength": 1,
           "description": "Stable server-assigned point identity."
+        },
+        "pinned": {
+          "type": "boolean",
+          "default": false
         }
       }
     }

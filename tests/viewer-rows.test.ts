@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countExpiryKeys, pointKey, projectNames, viewerRows } from '../src/viewer/rows.ts';
+import {
+  collapsedRowKeys,
+  countExpiryKeys,
+  pointKey,
+  projectNames,
+  viewerRows,
+} from '../src/viewer/rows.ts';
 import type { StatusEntry } from '../src/shared/types.ts';
 
 const entry = (session: string, branch: string, times: (string | null)[]): StatusEntry => ({
@@ -162,4 +168,52 @@ test('repository order uses the latest update across all its directories', () =>
   assert.deepEqual(labels('updated-at-desc'), ['owner/a', 'owner/b']);
   assert.deepEqual(labels('updated-at-asc'), ['owner/b', 'owner/a']);
   assert.deepEqual(labels('project-directory-asc'), ['owner/a', 'owner/b']);
+});
+
+test('pins lead each branch in either sort order and do not count toward expiry', () => {
+  const a = entry('pins', 'main', [
+    '2026-11-03T01:00:00Z',
+    '2026-11-03T02:00:00Z',
+    '2026-11-03T03:00:00Z',
+  ]);
+  a.points[0].pinned = true;
+  a.points[1].pinned = true;
+  for (const [order, expected] of [
+    ['submitted-at-asc', ['pins0', 'pins1', 'pins2']],
+    ['submitted-at-desc', ['pins1', 'pins0', 'pins2']],
+  ] as const) {
+    assert.deepEqual(
+      viewerRows([a], ['demo'], order)
+        .filter((r) => r.kind === 'point')
+        .map((r) => r.point.text),
+      expected,
+    );
+  }
+  assert.deepEqual([...countExpiryKeys([a], 1)], [pointKey(a, a.points[2], 2)]);
+});
+
+test('collapse hides descendants only and preserves subgroup choices across updates', () => {
+  const rows = viewerRows(entries, ['demo']);
+  const project = rows.find((row) => row.kind === 'project')!;
+  const branches = rows.filter((row) => row.kind === 'branch');
+  const collapsed = new Set([branches[0].key]);
+  const hidden = collapsedRowKeys(rows, collapsed);
+  assert.equal(hidden.has(branches[0].key), false);
+  assert.equal(hidden.has(branches[1].key), false);
+  assert.deepEqual(
+    rows.filter((row) => hidden.has(row.key)).map((row) => row.kind),
+    ['point', 'point', 'point', 'point'],
+  );
+  collapsed.add(project.key);
+  assert.equal(collapsedRowKeys(rows, collapsed).size, rows.length - 1);
+  collapsed.delete(project.key);
+  assert.deepEqual(collapsedRowKeys(rows, collapsed), hidden);
+
+  const updated = [...entries, entry('new', 'main', ['2026-11-03T06:00:00Z'])];
+  const nextRows = viewerRows(updated, ['demo']);
+  const nextHidden = collapsedRowKeys(nextRows, collapsed);
+  const newPoint = nextRows.find((row) => row.kind === 'point' && row.point.text === 'new0')!;
+  assert.equal(nextHidden.has(newPoint.key), true);
+  assert.equal(updated.at(-1)!.points.length, 1);
+  assert.equal(collapsedRowKeys(nextRows, new Set()).size, 0);
 });

@@ -1,7 +1,14 @@
 <script lang="ts">
   import { check } from '@tauri-apps/plugin-updater';
   import { startUpdateSchedule } from '../shared/update-schedule';
-  import { countExpiryKeys, pointKey, projectNames, relativeTime, viewerRows } from './rows';
+  import {
+    collapsedRowKeys,
+    countExpiryKeys,
+    pointKey,
+    projectNames,
+    relativeTime,
+    viewerRows,
+  } from './rows';
   import { onMount, tick } from 'svelte';
   import { fly } from 'svelte/transition';
   import { isUndoShortcut } from './undo-shortcut';
@@ -19,6 +26,27 @@
   const controller = new ViewerController(timers, motion);
   const textScales = [0.85, 1, 1.15, 1.35];
   const themes = ['system', 'light', 'dark'] as const;
+  let collapsed = new Set<string>();
+  let hoveredHeadings = new Set<string>();
+  function hoverRow(key: string) {
+    const headings = new Set<string>();
+    for (let index = rows.findIndex((row) => row.key === key); index >= 0; index--) {
+      const row = rows[index];
+      if (row.kind === 'branch' && !headings.size) headings.add(row.key);
+      if (row.kind === 'project') {
+        headings.add(row.key);
+        break;
+      }
+    }
+    hoveredHeadings = headings;
+  }
+  function toggleCollapsed(key: string) {
+    const next = new Set(collapsed);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    collapsed = next;
+  }
+  $: hiddenRows = collapsedRowKeys(rows, collapsed);
   let availableVersion: string | null = null;
   let windowFocused = true;
   let now = controller.state.now;
@@ -94,6 +122,23 @@
       },
       () => command('get_snapshot'),
     );
+  }
+  async function togglePointPin(entry: (typeof entries)[number], pointIndex: number) {
+    const point = entry.points[pointIndex];
+    if (!point.id) return;
+    try {
+      await command('set_point_pinned', {
+        folderName: entry.folder_name,
+        sessionId: entry.session_id,
+        branch: entry.branch,
+        updatedAt: entry.updated_at,
+        pointId: point.id,
+        pinned: !point.pinned,
+      });
+      controller.acceptSnapshot(await command('get_snapshot'));
+    } catch (error) {
+      controller.setErrorForView(error);
+    }
   }
   async function cycleTheme() {
     if (!settings) return;
@@ -368,15 +413,48 @@
   <section
     class="document"
     aria-label="Project status"
+    onpointerleave={() => (hoveredHeadings = new Set())}
     onselectstart={() => controller.setSelection(true)}
   >
     {#each rows as row (row.key)}
-      <div class="motion-row" data-row-key={row.key} use:motion.row={row.key}>
-        <div>
-          {#if row.kind === 'project'}
-            <h2>{row.folder}</h2>
-          {:else if row.kind === 'branch'}
-            <p>{row.branch}</p>
+      <div
+        class="motion-row"
+        class:collapsed-row={hiddenRows.has(row.key)}
+        inert={hiddenRows.has(row.key)}
+        aria-hidden={hiddenRows.has(row.key) ? true : undefined}
+        onpointerenter={() => hoverRow(row.key)}
+        data-row-key={row.key}
+        use:motion.row={row.key}
+      >
+        <div class="row-content">
+          {#if row.kind !== 'point'}
+            <div class="group-heading" class:is-hovered={hoveredHeadings.has(row.key)}>
+              {#if row.kind === 'project'}
+                <h2>{row.folder}</h2>
+              {:else}
+                <p>{row.branch}</p>
+              {/if}
+              <button
+                class="collapse-toggle"
+                class:is-collapsed={collapsed.has(row.key)}
+                aria-expanded={!collapsed.has(row.key)}
+                aria-label={`${collapsed.has(row.key) ? 'Expand' : 'Collapse'} ${row.kind === 'project' ? row.folder : row.branch}`}
+                title={collapsed.has(row.key) ? 'Expand group' : 'Collapse group'}
+                onclick={() => toggleCollapsed(row.key)}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  aria-hidden="true"
+                >
+                  <path d="m6 3 5 5-5 5" />
+                </svg>
+              </button>
+            </div>
           {:else}
             {@const { entry, point, pointIndex } = row}
             {@const link = safeLink(point.link)}
@@ -384,12 +462,13 @@
               <li
                 class="status-point"
                 class:removing={pendingRemoval.has(row.key)}
-                class:expiring-soon={countExpiring.has(row.key) ||
-                  expirySoon(
-                    point.submitted_at ?? entry.updated_at,
-                    settings?.autoClearAfterMinutes ?? null,
-                    now,
-                  )}
+                class:expiring-soon={!point.pinned &&
+                  (countExpiring.has(row.key) ||
+                    expirySoon(
+                      point.submitted_at ?? entry.updated_at,
+                      settings?.autoClearAfterMinutes ?? null,
+                      now,
+                    ))}
               >
                 <span class="point-text"
                   >{#if point.done}<strong>DONE</strong>: {' '}{/if}{point.text}{#if link}{' '}<a
@@ -399,14 +478,36 @@
                       rel="noopener noreferrer">{linkLabel(link)}</a
                     >{/if}</span
                 >
-                <span class="point-actions">
+                <span class="point-actions" class:pinned={point.pinned}>
+                  <button
+                    class="pin-point"
+                    class:active={point.pinned}
+                    onclick={() => void togglePointPin(entry, pointIndex)}
+                    disabled={dismissing.has(row.key) || pendingRemoval.has(row.key)}
+                    aria-label={`${point.pinned ? 'Unpin' : 'Pin'} ${point.text}`}
+                    aria-pressed={!!point.pinned}
+                    title={point.pinned ? 'Unpin point' : 'Pin point'}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill={point.pinned ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                      ><path d="m16 3 5 5-4 1-4 4v4l-3-3-7 7 7-7-3-3h4l4-4z" /></svg
+                    >
+                  </button>
                   <span class="point-age"
                     >{relativeTime(point.submitted_at ?? entry.updated_at, now)}</span
                   >
                   <button
                     class="dismiss-point"
                     onclick={() => void dismissPoint(entry, pointIndex)}
-                    disabled={dismissing.has(row.key) || pendingRemoval.has(row.key)}
+                    disabled={!!point.pinned ||
+                      dismissing.has(row.key) ||
+                      pendingRemoval.has(row.key)}
                     aria-label={`Dismiss ${point.text}`}
                     title="Dismiss point">×</button
                   >
@@ -447,7 +548,79 @@
     );
   }
   .motion-row {
+    display: grid;
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transition:
+      grid-template-rows 220ms var(--ease-gentle-out),
+      opacity 160ms ease;
+  }
+  .motion-row.collapsed-row {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .row-content {
+    min-height: 0;
+    overflow: clip;
     display: flow-root;
+  }
+  .group-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3rem;
+  }
+  .group-heading h2,
+  .group-heading p {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .collapse-toggle {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 3px;
+    color: var(--muted);
+    opacity: 0;
+    transition:
+      opacity 120ms ease,
+      background 120ms ease;
+  }
+  .collapse-toggle svg {
+    transform: rotate(90deg);
+    transition: transform 220ms var(--ease-gentle-out);
+  }
+  .collapse-toggle.is-collapsed svg {
+    transform: rotate(0);
+  }
+  .group-heading.is-hovered .collapse-toggle,
+  .group-heading:hover .collapse-toggle,
+  .group-heading:focus-within .collapse-toggle,
+  .collapse-toggle.is-collapsed {
+    opacity: 1;
+  }
+  .collapse-toggle:hover {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    color: var(--text);
+  }
+  .collapse-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  @media (hover: none) {
+    .collapse-toggle {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .motion-row,
+    .collapse-toggle,
+    .collapse-toggle svg {
+      transition: none;
+    }
   }
   .motion-row h2 {
     margin: 0 0 0.2em;
@@ -649,6 +822,22 @@
   .status-point:focus-within .point-actions {
     opacity: 1;
     pointer-events: auto;
+  }
+  .point-actions.pinned {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .pin-point {
+    display: inline-flex;
+    padding: 0.15rem;
+    color: inherit;
+  }
+  .pin-point.active,
+  .pin-point:hover {
+    color: var(--accent);
+  }
+  .pin-point:focus-visible {
+    outline: 2px solid var(--accent);
   }
   .dismiss-point {
     padding: 0 0.28rem;

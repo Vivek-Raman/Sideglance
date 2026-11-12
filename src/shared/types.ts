@@ -7,6 +7,7 @@ export type StatusSortOrder = 'submitted-at-desc' | 'submitted-at-asc';
 export type StatusPoint = {
   text: string;
   done: boolean;
+  pinned?: boolean;
   link: string | null;
   submitted_at?: string | null;
   id?: string | null;

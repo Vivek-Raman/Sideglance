@@ -10,6 +10,8 @@ pub struct Point {
     #[serde(default)]
     pub done: bool,
     #[serde(default)]
+    pub pinned: bool,
+    #[serde(default)]
     pub link: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub submitted_at: Option<String>,
@@ -169,6 +171,18 @@ pub fn upsert(
         .iter()
         .find(|entry| entry.folder_name == folder && entry.session_id.as_deref() == Some(&session))
         .cloned();
+    // Pinned points belong to the user, never to an agent replacement.
+    let pinned: Vec<Point> = existing
+        .as_ref()
+        .into_iter()
+        .flat_map(|entry| entry.points.iter().filter(|p| p.pinned).cloned())
+        .collect();
+    points.retain(|point| {
+        !point.pinned
+            && !pinned
+                .iter()
+                .any(|old| old.id == point.id && point.id.is_some())
+    });
     let timestamp = now.to_rfc3339();
     let old_ids: HashSet<String> = existing
         .as_ref()
@@ -202,6 +216,7 @@ pub fn upsert(
                         !reserved.contains(old.id.as_deref().unwrap_or(""))
                             && !matched.contains(old.id.as_deref().unwrap_or(""))
                             && point.id.is_none()
+                            && !old.pinned
                             && old.text == point.text
                             && old.done == point.done
                             && old.link == point.link
@@ -224,6 +239,13 @@ pub fn upsert(
             point.submitted_at = Some(timestamp.clone());
         }
     }
+    if points.is_empty() && pinned.is_empty() {
+        return Err("Points are required".into());
+    }
+    let branch_changed = existing.as_ref().is_some_and(|old| old.branch != branch);
+    if !branch_changed {
+        points.extend(pinned.clone());
+    }
     let entry = Entry {
         repository: None,
         folder_name: folder,
@@ -239,7 +261,17 @@ pub fn upsert(
         .iter()
         .position(|old| old.folder_name == entry.folder_name && old.session_id == entry.session_id)
     {
-        candidate.entries[index] = entry;
+        if branch_changed && !pinned.is_empty() {
+            let mut saved = candidate.entries[index].clone();
+            saved.session_id = None;
+            saved.points = pinned;
+            candidate.entries.push(saved);
+        }
+        if entry.points.is_empty() {
+            candidate.entries.remove(index);
+        } else {
+            candidate.entries[index] = entry;
+        }
     } else {
         candidate.entries.push(entry);
     }
@@ -265,6 +297,11 @@ pub fn dismiss(
             && entry.session_id.as_deref() == session
             && entry.branch == branch
             && entry.updated_at == updated_at
+            && (point_id.is_empty()
+                || entry
+                    .points
+                    .iter()
+                    .any(|p| p.id.as_deref() == Some(point_id)))
     }) else {
         return false;
     };
@@ -279,7 +316,9 @@ pub fn dismiss(
     let Some(point_index) = point_index else {
         return false;
     };
-    if point_index >= document.entries[entry_index].points.len() {
+    if point_index >= document.entries[entry_index].points.len()
+        || document.entries[entry_index].points[point_index].pinned
+    {
         return false;
     }
     document.entries[entry_index].points.remove(point_index);
@@ -303,9 +342,11 @@ pub fn prune(
         .sum::<usize>();
     for entry in &mut document.entries {
         entry.points.retain(|point| {
-            point.submitted_at.as_ref().is_none_or(|at| {
-                DateTime::parse_from_rfc3339(at).is_ok_and(|at| at.with_timezone(&Utc) >= cutoff)
-            })
+            point.pinned
+                || point.submitted_at.as_ref().is_none_or(|at| {
+                    DateTime::parse_from_rfc3339(at)
+                        .is_ok_and(|at| at.with_timezone(&Utc) >= cutoff)
+                })
         });
     }
     document.entries.retain(|entry| !entry.points.is_empty());
@@ -338,6 +379,9 @@ pub fn apply_retention(
                 let mut projects = std::collections::HashMap::<String, Vec<_>>::new();
                 for (entry_index, entry) in document.entries.iter().enumerate() {
                     for (point_index, point) in entry.points.iter().enumerate() {
+                        if point.pinned {
+                            continue;
+                        }
                         let at = point.submitted_at.as_deref().unwrap_or(&entry.updated_at);
                         let at = DateTime::parse_from_rfc3339(at).map_err(|e| e.to_string())?;
                         projects

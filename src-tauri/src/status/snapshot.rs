@@ -212,6 +212,7 @@ mod tests {
                 vec![Point {
                     text: "first".into(),
                     done: false,
+                    pinned: false,
                     link: None,
                     submitted_at: None,
                     id: None,
@@ -230,6 +231,7 @@ mod tests {
                 vec![Point {
                     text: "second".into(),
                     done: false,
+                    pinned: false,
                     link: None,
                     submitted_at: None,
                     id: first.document.entries[0].points[0].id.clone(),

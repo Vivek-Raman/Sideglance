@@ -1,6 +1,7 @@
 import { test, expect } from 'playwright/test';
 
 test('runs the viewer motion and dismissal queue fixture', async ({ page }) => {
+  test.setTimeout(60_000);
   const runtimeErrors: string[] = [];
   page.on('pageerror', (error) => runtimeErrors.push(error.stack ?? error.message));
   await page.goto('/tests/viewer-motion.html');

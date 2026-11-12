@@ -18,6 +18,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             desktop::commands::get_snapshot,
             desktop::commands::dismiss_point,
+            desktop::commands::set_point_pinned,
             desktop::commands::restore_point,
             desktop::commands::set_undo_limit,
             desktop::commands::get_settings,

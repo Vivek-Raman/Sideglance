@@ -337,12 +337,14 @@ export class ViewerController {
     if (minutes == null) return;
     const next = this.state.entries
       .flatMap((entry) =>
-        entry.points.map(
-          (point) =>
-            new Date(point.submitted_at ?? entry.updated_at).getTime() +
-            minutes * 60_000 -
-            10 * 60_000,
-        ),
+        entry.points
+          .filter((point) => !point.pinned)
+          .map(
+            (point) =>
+              new Date(point.submitted_at ?? entry.updated_at).getTime() +
+              minutes * 60_000 -
+              10 * 60_000,
+          ),
       )
       .filter((time) => time > this.state.now)
       .sort((a, b) => a - b)[0];
@@ -362,6 +364,7 @@ export class ViewerController {
   ): Promise<void> {
     if (
       this.disposed ||
+      point.pinned ||
       this.state.undoing ||
       this.state.dismissing.has(removeKey) ||
       this.state.pendingRemoval.has(removeKey)

@@ -68,6 +68,8 @@ export function viewerRows(
           entry.points.map((point, pointIndex) => ({ entry, point, pointIndex })),
         );
       points.sort((left, right) => {
+        const pinOrder = Number(!!right.point.pinned) - Number(!!left.point.pinned);
+        if (pinOrder) return pinOrder;
         const leftTime = Date.parse(left.point.submitted_at ?? left.entry.updated_at);
         const rightTime = Date.parse(right.point.submitted_at ?? right.entry.updated_at);
         return order === 'submitted-at-asc' ? leftTime - rightTime : rightTime - leftTime;
@@ -83,6 +85,25 @@ export function viewerRows(
     }
     return rows;
   });
+}
+
+// Collapse affects presentation only. Keep all rows and source entries intact.
+export function collapsedRowKeys(rows: ViewerRow[], collapsed: ReadonlySet<string>) {
+  const hidden = new Set<string>();
+  let groupCollapsed = false;
+  let branchCollapsed = false;
+  for (const row of rows) {
+    if (row.kind === 'project') {
+      groupCollapsed = collapsed.has(row.key);
+      branchCollapsed = false;
+    } else if (row.kind === 'branch') {
+      branchCollapsed = collapsed.has(row.key);
+      if (groupCollapsed) hidden.add(row.key);
+    } else if (groupCollapsed || branchCollapsed) {
+      hidden.add(row.key);
+    }
+  }
+  return hidden;
 }
 
 function groupLabel(entry: StatusEntry, grouping: StatusGrouping) {
@@ -147,6 +168,7 @@ export function countExpiryKeys(entries: StatusEntry[], limit: number | null): S
   entries.forEach((entry, entryIndex) => {
     const points = projects.get(entry.folder_name) ?? [];
     entry.points.forEach((point, pointIndex) => {
+      if (point.pinned) return;
       points.push({
         key: pointKey(entry, point, pointIndex),
         time: Date.parse(point.submitted_at ?? entry.updated_at),

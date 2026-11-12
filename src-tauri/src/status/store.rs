@@ -118,6 +118,11 @@ impl StatusStore {
             .filter(|entry| {
                 entry.folder_name == folder && entry.session_id.as_deref() == Some(session)
             })
+            .map(|mut entry| {
+                entry.points.retain(|point| !point.pinned);
+                entry
+            })
+            .filter(|entry| !entry.points.is_empty())
             .collect())
     }
     fn save_unlocked(&self, document: &Document) -> Result<usize, StatusError> {
@@ -181,6 +186,39 @@ impl StatusStore {
         }
         domain::validate(&document).map_err(StatusError::InvalidDocument)?;
         self.save_unlocked(&document)
+    }
+    pub fn set_point_pinned(
+        &self,
+        folder: &str,
+        session: Option<&str>,
+        branch: &str,
+        updated_at: &str,
+        point_id: &str,
+        pinned: bool,
+    ) -> Result<(), StatusError> {
+        let _lock = self.lock()?;
+        let mut document = self.read_unlocked()?;
+        let point = document
+            .entries
+            .iter_mut()
+            .find(|e| {
+                e.folder_name == folder
+                    && e.session_id.as_deref() == session
+                    && e.branch == branch
+                    && e.updated_at == updated_at
+                    && e.points.iter().any(|p| p.id.as_deref() == Some(point_id))
+            })
+            .and_then(|e| {
+                e.points
+                    .iter_mut()
+                    .find(|p| p.id.as_deref() == Some(point_id))
+            })
+            .ok_or_else(|| StatusError::Conflict("This point changed. Please try again.".into()))?;
+        point.pinned = pinned;
+        document.version = 2;
+        domain::validate(&document).map_err(StatusError::InvalidDocument)?;
+        self.save_unlocked(&document)?;
+        Ok(())
     }
     pub fn dismiss(
         &self,
@@ -265,10 +303,90 @@ mod tests {
         Point {
             text: text.into(),
             done: false,
+            pinned: false,
             link: None,
             submitted_at: None,
             id: None,
         }
+    }
+
+    #[test]
+    fn pins_are_private_protected_and_survive_branch_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = StatusStore::new(dir.path().join("status.json"));
+        store
+            .upsert(
+                "p".into(),
+                "s".into(),
+                "main".into(),
+                vec![point("keep"), point("editable")],
+            )
+            .unwrap();
+        let entry = store.read().unwrap().entries.remove(0);
+        let id = entry.points[0].id.as_deref().unwrap();
+        store
+            .set_point_pinned("p", Some("s"), "main", &entry.updated_at, id, true)
+            .unwrap();
+        assert_eq!(store.read_project("p", "s").unwrap()[0].points.len(), 1);
+        assert!(!store
+            .dismiss("p", Some("s"), "main", &entry.updated_at, id, None)
+            .unwrap());
+        let mut attempted_edit = entry.points[0].clone();
+        attempted_edit.text = "tampered".into();
+        store
+            .upsert(
+                "p".into(),
+                "s".into(),
+                "main".into(),
+                vec![attempted_edit, point("new")],
+            )
+            .unwrap();
+        let current = store.read().unwrap().entries.remove(0);
+        assert!(current.points.iter().any(|p| p.text == "keep" && p.pinned));
+        assert!(!current.points.iter().any(|p| p.text == "tampered"));
+        store
+            .apply_retention(&[
+                domain::RetentionRule::CountPerProject(0),
+                domain::RetentionRule::Age(Duration::ZERO),
+            ])
+            .unwrap();
+        assert!(store.read_project("p", "s").unwrap().is_empty());
+        store
+            .upsert(
+                "p".into(),
+                "s".into(),
+                "feature".into(),
+                vec![point("next")],
+            )
+            .unwrap();
+        let doc = store.read().unwrap();
+        let pinned = doc.entries.iter().find(|e| e.branch == "main").unwrap();
+        assert_eq!(pinned.points[0].text, "keep");
+        assert!(pinned.points[0].pinned);
+        assert_eq!(
+            store.read_project("p", "s").unwrap()[0].points[0].text,
+            "next"
+        );
+        store
+            .set_point_pinned(
+                "p",
+                None,
+                "main",
+                &pinned.updated_at,
+                pinned.points[0].id.as_deref().unwrap(),
+                false,
+            )
+            .unwrap();
+        assert!(store
+            .dismiss(
+                "p",
+                None,
+                "main",
+                &pinned.updated_at,
+                pinned.points[0].id.as_deref().unwrap(),
+                None
+            )
+            .unwrap());
     }
 
     #[test]
@@ -428,6 +546,7 @@ mod tests {
                     vec![Point {
                         text: text.into(),
                         done: false,
+                        pinned: false,
                         link: link.map(str::to_owned),
                         submitted_at: None,
                         id: None
@@ -652,6 +771,7 @@ mod tests {
                     Point {
                         text: "old".into(),
                         done: false,
+                        pinned: false,
                         link: None,
                         submitted_at: Some((now - chrono::Duration::hours(2)).to_rfc3339()),
                         id: Some("old".into()),
@@ -659,6 +779,7 @@ mod tests {
                     Point {
                         text: "new".into(),
                         done: false,
+                        pinned: false,
                         link: None,
                         submitted_at: Some(now.to_rfc3339()),
                         id: Some("new".into()),

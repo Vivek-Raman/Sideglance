@@ -139,6 +139,31 @@ window.motionResults = (async () => {
   await pause(50);
   await push([entry('Alpha'), entry('Beta'), entry('Gamma')]);
   await pause(1300);
+  const alphaHeading = [...document.querySelectorAll('.group-heading')].find(
+    (node) => node.textContent.trim() === 'Alpha',
+  );
+  const collapse = alphaHeading.querySelector('.collapse-toggle');
+  const alphaPoint = find('Alpha point 0');
+  const alphaRow = alphaPoint.closest('.motion-row');
+  collapse.click();
+  await pause(350);
+  assert(collapse.getAttribute('aria-expanded') === 'false', 'group did not collapse');
+  assert(alphaRow.getBoundingClientRect().height < 1, 'collapsed row occupies space');
+  assert(alphaRow.inert && alphaPoint.isConnected, 'collapse must retain inert content');
+  await push(
+    entries.map((item) =>
+      item.folder_name === 'Alpha'
+        ? { ...item, points: [...item.points, point('Captured while collapsed')] }
+        : item,
+    ),
+  );
+  await pause(650);
+  assert(find('Captured while collapsed'), 'collapsed group dropped update');
+  collapse.click();
+  await pause(350);
+  assert(alphaRow.getBoundingClientRect().height > 1 && !alphaRow.inert, 'expand failed');
+  assert(alphaPoint === find('Alpha point 0'), 'collapse recreated point');
+  results.push({ name: 'collapse retains live updates and restores mounted content' });
   const wrappedBelow = find('Alpha point 0');
   const wrapped = find('Alpha point 1').closest('.motion-row');
   const wrappedHeight = wrapped.getBoundingClientRect().height;
@@ -243,7 +268,7 @@ window.motionResults = (async () => {
   const dismissed = find('second-session point 0');
   const below = find('second-session point 1');
   const oldY = below.getBoundingClientRect().top;
-  dismissed.closest('li').querySelector('button').click();
+  dismissed.closest('li').querySelector('.dismiss-point').click();
   await pause(180);
   assert(dismissed.isConnected, 'dismissal removed row before exit completed');
   assert(
@@ -259,13 +284,13 @@ window.motionResults = (async () => {
   const lastExit = find('Batch point 1');
   const survivor = find('Same time A');
   const survivorY = survivor.getBoundingClientRect().top;
-  firstExit.closest('li').querySelector('button').click();
+  firstExit.closest('li').querySelector('.dismiss-point').click();
   await pause(180);
   assert(
-    !lastExit.closest('li').querySelector('button').disabled,
+    !lastExit.closest('li').querySelector('.dismiss-point').disabled,
     'another dismissal disabled this row',
   );
-  lastExit.closest('li').querySelector('button').click();
+  lastExit.closest('li').querySelector('.dismiss-point').click();
   settings = { ...settings, textScale: 1.15, projectSortOrder: 'project-directory-asc' };
   emit('settings-update', settings);
   await push([...entries, entry('Incoming')]);
@@ -290,7 +315,7 @@ window.motionResults = (async () => {
   });
   const failed = find('Incoming point 0');
   failDismiss = true;
-  failed.closest('li').querySelector('button').click();
+  failed.closest('li').querySelector('.dismiss-point').click();
   await pause(380);
   assert(failed.isConnected, 'failed dismissal removed the row');
   assert(
