@@ -20,7 +20,7 @@ After upgrading the app, update installed copies of the skill through Settings. 
 
 Settings checks for updates only when the user selects **Check for updates**. The Tauri updater fetches the public `latest.json` asset from the latest stable GitHub release, verifies the update with the public key embedded in `src-tauri/tauri.conf.json`, then installs it after the user selects **Download and install**. The private counterpart is never committed. It must be stored in GitHub Actions secrets as `TAURI_SIGNING_PRIVATE_KEY`, with `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` when the key has one.
 
-`.github/workflows/release.yml` runs manually against a version tag. It creates a draft release, builds signed macOS arm64, Linux x64, and Windows x64 bundles, uploads the signature files, writes a platform manifest, then publishes the release. It fails without all required signatures. Linux self-update supports AppImage only. Debian and RPM users should update with their package manager.
+`.github/workflows/release.yml` starts when a GitHub release is created. It builds signed macOS arm64, Linux x64, and Windows x64 bundles in parallel. A final job uploads one platform manifest after all three builds pass. Update checks may temporarily fail while a new release builds, because `latest.json` is not available until that final job completes. Linux self-update supports AppImage only. Debian and RPM users should update with their package manager.
 
 The bundled MCP executable is replaced with the app. A running agent client can keep using the old process until it restarts, so users should restart their client after updating. The updater does not replace copied skills or alter agent configuration.
 
