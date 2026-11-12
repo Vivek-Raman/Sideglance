@@ -320,7 +320,6 @@
   .settings-content {
     max-width: 820px;
     margin: 0 auto;
-    padding-bottom: calc(100dvh - 120px);
   }
   .settings-page .page-title {
     font-size: 1.5rem;
@@ -363,6 +362,7 @@
   .reset {
     grid-template-columns: 1fr auto;
     align-items: center;
+    margin-bottom: 0;
   }
   .reset button,
   button {
