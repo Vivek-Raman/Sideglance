@@ -67,13 +67,17 @@
     <p>Choose how project updates are organized and retained.</p>
   </div>
   <div class="setting-row">
-    <label for="project-sort-order">Project order</label><select
+    <label for="project-sort-order">Group order</label><select
       id="project-sort-order"
       bind:value={settings.projectSortOrder}
       onchange={onSortChange}
       ><option value="updated-at-desc">Most recently updated first</option><option
         value="updated-at-asc">Least recently updated first</option
-      ><option value="project-directory-asc">Project directory A-Z</option></select
+      ><option value="project-directory-asc"
+        >{settings.statusGrouping === 'repository'
+          ? 'Repository A-Z'
+          : 'Project directory A-Z'}</option
+      ></select
     >
   </div>
   <div class="setting-row">

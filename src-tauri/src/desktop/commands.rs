@@ -114,14 +114,12 @@ pub(crate) fn set_appearance_settings(
 }
 
 #[tauri::command]
-pub(crate) fn set_header_settings(
-    header_title: crate::preferences::HeaderTitle,
-    header_subtitle: crate::preferences::HeaderSubtitle,
+pub(crate) fn set_status_grouping(
+    status_grouping: crate::preferences::StatusGrouping,
     owner: State<'_, Arc<SettingsOwner>>,
 ) -> Result<(), String> {
     owner.update(|settings| {
-        settings.header.header_title = header_title;
-        settings.header.header_subtitle = header_subtitle;
+        settings.status_grouping = status_grouping;
         Ok(())
     })?;
     Ok(())

@@ -24,7 +24,7 @@ pub fn run() {
             desktop::commands::reset_settings,
             desktop::commands::open_settings,
             desktop::commands::set_appearance_settings,
-            desktop::commands::set_header_settings,
+            desktop::commands::set_status_grouping,
             desktop::commands::set_project_sort_order,
             desktop::commands::set_status_sort_order,
             desktop::commands::set_auto_clear_after_minutes,

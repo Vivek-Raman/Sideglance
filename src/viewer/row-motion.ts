@@ -54,10 +54,13 @@ export class RowMotion implements ViewerMotion {
     const next = new Set(
       viewerRows(
         layout.entries,
-        projectNames(layout.entries, layout.settings?.projectSortOrder ?? 'project-directory-asc'),
+        projectNames(
+          layout.entries,
+          layout.settings?.projectSortOrder ?? 'project-directory-asc',
+          layout.settings?.statusGrouping,
+        ),
         layout.settings?.statusSortOrder,
-        layout.settings?.headerTitle,
-        layout.settings?.headerSubtitle,
+        layout.settings?.statusGrouping,
       ).map(({ key }) => key),
     );
     const exits: Promise<void>[] = [];

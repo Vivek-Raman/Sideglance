@@ -31,8 +31,7 @@ let failDismiss = false;
 let settings = {
   theme: 'light',
   primaryColor: '#c98c5a',
-  headerTitle: 'project-directory',
-  headerSubtitle: 'repository-branch',
+  statusGrouping: 'project-directory',
   textScale: 1,
   projectSortOrder: 'project-directory-asc',
   statusSortOrder: 'submitted-at-desc',
@@ -332,11 +331,11 @@ window.motionResults = (async () => {
       );
     }
   };
-  settings = { ...settings, headerTitle: 'repository-branch', headerSubtitle: 'none' };
+  settings = { ...settings, statusGrouping: 'repository' };
   emit('settings-update', settings);
   await pause(850);
   assertHeadersVisible();
-  assert(!document.querySelector('.motion-row p'), 'None left subtitles visible');
+  assert(document.querySelector('.motion-row p'), 'branch subgroup missing');
   // A later settings update must retain the existing repository title rows.
   settings = { ...settings, textScale: 1 };
   emit('settings-update', settings);
@@ -345,7 +344,7 @@ window.motionResults = (async () => {
   await push([...entries]);
   await pause(850);
   assertHeadersVisible();
-  settings = { ...settings, headerTitle: 'project-directory', headerSubtitle: 'project-directory' };
+  settings = { ...settings, statusGrouping: 'project-directory' };
   emit('settings-update', settings);
   await pause(850);
   assertHeadersVisible();

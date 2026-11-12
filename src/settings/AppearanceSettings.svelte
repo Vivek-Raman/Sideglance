@@ -2,7 +2,7 @@
   import type { Settings } from '../shared/types';
   export let settings: Settings;
   export let primaryColors: { name: string; value: string }[] = [];
-  export let onHeaderSave: () => void;
+  export let onGroupingSave: () => void;
   export let onSave: () => void;
 </script>
 
@@ -12,18 +12,10 @@
     <p>Set the colors, text size, and project headers used in the viewer.</p>
   </div>
   <div class="setting-row">
-    <label for="header-title">Title</label>
-    <select id="header-title" bind:value={settings.headerTitle} onchange={onHeaderSave}>
-      <option value="project-directory">Project directory</option>
-      <option value="repository-branch">Repo owner/repo name + branch</option>
-    </select>
-  </div>
-  <div class="setting-row">
-    <label for="header-subtitle">Subtitle</label>
-    <select id="header-subtitle" bind:value={settings.headerSubtitle} onchange={onHeaderSave}>
-      <option value="repository-branch">Repo owner/repo name + branch</option>
-      <option value="project-directory">Project directory</option>
-      <option value="none">None</option>
+    <label for="status-grouping">Group status items by</label>
+    <select id="status-grouping" bind:value={settings.statusGrouping} onchange={onGroupingSave}>
+      <option value="project-directory">Directory → branch</option>
+      <option value="repository">Repository → branch</option>
     </select>
   </div>
   <div class="setting-row">

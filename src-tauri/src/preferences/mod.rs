@@ -10,49 +10,10 @@ use crate::paths;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
-pub enum HeaderTitle {
+pub enum StatusGrouping {
     #[default]
     ProjectDirectory,
-    RepositoryBranch,
-}
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum HeaderSubtitle {
-    ProjectDirectory,
-    #[default]
-    RepositoryBranch,
-    None,
-}
-#[derive(Clone, Debug, Serialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct HeaderSettings {
-    pub header_title: HeaderTitle,
-    pub header_subtitle: HeaderSubtitle,
-}
-impl<'de> Deserialize<'de> for HeaderSettings {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Input {
-            header_title: Option<HeaderTitle>,
-            header_subtitle: Option<HeaderSubtitle>,
-            header_layout: Option<String>,
-        }
-        let input = Input::deserialize(deserializer)?;
-        let repository_first = input.header_layout.as_deref() == Some("repository-first");
-        Ok(Self {
-            header_title: input.header_title.unwrap_or(if repository_first {
-                HeaderTitle::RepositoryBranch
-            } else {
-                HeaderTitle::ProjectDirectory
-            }),
-            header_subtitle: input.header_subtitle.unwrap_or(if repository_first {
-                HeaderSubtitle::ProjectDirectory
-            } else {
-                HeaderSubtitle::RepositoryBranch
-            }),
-        })
-    }
+    Repository,
 }
 
 pub const PROJECT_DIRECTORY_ASC: &str = "project-directory-asc";
@@ -99,8 +60,8 @@ impl StatusSortOrder {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    #[serde(flatten)]
-    pub header: HeaderSettings,
+    #[serde(default)]
+    pub status_grouping: StatusGrouping,
     #[serde(default = "default_theme")]
     pub theme: Theme,
     #[serde(default = "default_primary_color")]
@@ -144,7 +105,7 @@ fn default_project_sort_order() -> ProjectSortOrder {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            header: HeaderSettings::default(),
+            status_grouping: StatusGrouping::default(),
             theme: default_theme(),
             primary_color: default_primary_color(),
             text_scale: default_text_scale(),
@@ -389,35 +350,30 @@ pub fn settings_owner(app: &AppHandle) -> Result<Arc<SettingsOwner>, String> {
 mod tests {
     use super::*;
     #[test]
-    fn header_settings_default_migrate_and_persist() {
-        let defaults: Settings = serde_json::from_str("{}").unwrap();
-        assert_eq!(defaults.header, HeaderSettings::default());
-        let legacy: Settings =
-            serde_json::from_str(r#"{"headerLayout":"repository-first"}"#).unwrap();
-        assert_eq!(legacy.header.header_title, HeaderTitle::RepositoryBranch);
-        assert_eq!(
-            legacy.header.header_subtitle,
-            HeaderSubtitle::ProjectDirectory
-        );
+    fn grouping_defaults_ignore_old_headers_and_persist() {
+        let defaults: Settings = serde_json::from_str(
+            r#"{"headerTitle":"repository-branch","headerSubtitle":"none","headerLayout":"repository-first"}"#
+        ).unwrap();
+        assert_eq!(defaults.status_grouping, StatusGrouping::ProjectDirectory);
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("settings.json");
         let owner = SettingsOwner::from_path(path.clone()).unwrap();
         owner
             .update(|settings| {
-                settings.header.header_title = HeaderTitle::RepositoryBranch;
-                settings.header.header_subtitle = HeaderSubtitle::None;
+                settings.status_grouping = StatusGrouping::Repository;
                 Ok(())
             })
             .unwrap();
         let loaded = SettingsOwner::from_path(path).unwrap().snapshot();
-        assert_eq!(loaded.header.header_title, HeaderTitle::RepositoryBranch);
-        assert_eq!(loaded.header.header_subtitle, HeaderSubtitle::None);
+        assert_eq!(loaded.status_grouping, StatusGrouping::Repository);
         let json = serde_json::to_string(&loaded).unwrap();
-        assert!(!json.contains("headerLayout"));
+        assert!(!json.contains("header"));
         assert_eq!(serde_json::from_str::<Settings>(&json).unwrap(), loaded);
-        assert_eq!(owner.reset().unwrap().header, HeaderSettings::default());
-        assert!(serde_json::from_str::<Settings>(r#"{"headerTitle":"none"}"#).is_err());
-        assert!(serde_json::from_str::<Settings>(r#"{"headerSubtitle":"unknown"}"#).is_err());
+        assert_eq!(
+            owner.reset().unwrap().status_grouping,
+            StatusGrouping::ProjectDirectory
+        );
+        assert!(serde_json::from_str::<Settings>(r#"{"statusGrouping":"unknown"}"#).is_err());
     }
     #[test]
     fn status_sort_defaults_and_round_trips() {

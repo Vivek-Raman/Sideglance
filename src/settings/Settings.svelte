@@ -68,13 +68,12 @@
       saving = false;
     }
   }
-  async function saveHeaderLayout() {
+  async function saveGrouping() {
     if (!settings) return;
     settingsError = '';
     try {
-      await command('set_header_settings', {
-        headerTitle: settings.headerTitle,
-        headerSubtitle: settings.headerSubtitle,
+      await command('set_status_grouping', {
+        statusGrouping: settings.statusGrouping,
       });
     } catch (error) {
       settingsError = errorText(error);
@@ -202,7 +201,7 @@
           <AppearanceSettings
             {settings}
             {primaryColors}
-            onHeaderSave={() => void saveHeaderLayout()}
+            onGroupingSave={() => void saveGrouping()}
             onSave={() => void saveAppearanceSettings()}
           />
         </div>

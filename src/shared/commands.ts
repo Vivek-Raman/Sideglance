@@ -10,8 +10,8 @@ type CommandMap = {
     args: { theme: Settings['theme']; primaryColor: string; textScale: number };
     result: void;
   };
-  set_header_settings: {
-    args: { headerTitle: Settings['headerTitle']; headerSubtitle: Settings['headerSubtitle'] };
+  set_status_grouping: {
+    args: { statusGrouping: Settings['statusGrouping'] };
     result: void;
   };
   set_pinned: { args: { pinned: boolean }; result: void };

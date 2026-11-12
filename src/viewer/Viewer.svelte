@@ -46,14 +46,12 @@
     );
     if (!controller.state.undoCount) undoNotice = false;
   }
-  $: projects = projectNames(entries, settings?.projectSortOrder ?? 'project-directory-asc');
-  $: rows = viewerRows(
+  $: projects = projectNames(
     entries,
-    projects,
-    settings?.statusSortOrder,
-    settings?.headerTitle,
-    settings?.headerSubtitle,
+    settings?.projectSortOrder ?? 'project-directory-asc',
+    settings?.statusGrouping,
   );
+  $: rows = viewerRows(entries, projects, settings?.statusSortOrder, settings?.statusGrouping);
   $: countExpiring = countExpiryKeys(entries, settings?.maxStatusItemsPerProject ?? null);
   function safeLink(link: string | null) {
     if (!link) return null;

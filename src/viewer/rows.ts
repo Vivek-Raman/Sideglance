@@ -1,10 +1,4 @@
-import type {
-  StatusEntry,
-  StatusPoint,
-  StatusSortOrder,
-  HeaderTitle,
-  HeaderSubtitle,
-} from '../shared/types';
+import type { StatusEntry, StatusPoint, StatusSortOrder, StatusGrouping } from '../shared/types';
 
 type Row =
   | { key: string; kind: 'project'; folder: string }
@@ -49,33 +43,25 @@ export function viewerRows(
   entries: StatusEntry[],
   projects: string[],
   order: StatusSortOrder = 'submitted-at-desc',
-  title: HeaderTitle = 'project-directory',
-  subtitle: HeaderSubtitle = 'repository-branch',
+  grouping: StatusGrouping = 'project-directory',
 ): Row[] {
-  return projects.flatMap((folder) => {
-    const projectEntries = entries.filter((entry) => entry.folder_name === folder);
-    const rows: Row[] =
-      title === 'project-directory'
-        ? [{ key: JSON.stringify(['project', folder]), kind: 'project', folder }]
-        : [];
+  const groupKey = (entry: StatusEntry) => groupingKey(entry, grouping);
+  return projects.flatMap((group) => {
+    const projectEntries = entries.filter((entry) => groupKey(entry) === group);
+    const label = projectEntries[0] ? groupLabel(projectEntries[0], grouping) : group;
+    const rows: Row[] = [
+      { key: JSON.stringify(['project', grouping, group]), kind: 'project', folder: label },
+    ];
     for (const branch of new Set(projectEntries.map((entry) => entry.branch))) {
       const repository = projectEntries.find(
         (entry) => entry.branch === branch && entry.repository,
       )?.repository;
-      const label = repository ? `${repository} · ${branch}` : branch;
-      if (title === 'repository-branch') {
-        rows.push({
-          key: JSON.stringify(['project', folder, branch]),
-          kind: 'project',
-          folder: label,
-        });
-      }
-      if (subtitle !== 'none')
-        rows.push({
-          key: JSON.stringify(['branch', folder, branch]),
-          kind: 'branch',
-          branch: subtitle === 'repository-branch' ? label : folder,
-        });
+      rows.push({
+        key: JSON.stringify(['branch', grouping, group, branch]),
+        kind: 'branch',
+        branch:
+          grouping === 'project-directory' && repository ? `${repository} · ${branch}` : branch,
+      });
       const points = projectEntries
         .filter((entry) => entry.branch === branch)
         .flatMap((entry) =>
@@ -99,25 +85,41 @@ export function viewerRows(
   });
 }
 
+function groupLabel(entry: StatusEntry, grouping: StatusGrouping) {
+  return grouping === 'repository' ? entry.repository || entry.folder_name : entry.folder_name;
+}
+
+function groupingKey(entry: StatusEntry, grouping: StatusGrouping) {
+  if (grouping === 'project-directory') return entry.folder_name;
+  return JSON.stringify([
+    entry.repository ? 'repository' : 'directory',
+    groupLabel(entry, grouping),
+  ]);
+}
+
 export function projectNames(
   entries: StatusEntry[],
   order: 'project-directory-asc' | 'updated-at-desc' | 'updated-at-asc',
+  grouping: StatusGrouping = 'project-directory',
 ) {
   const latest = new Map<string, number>();
-  for (const entry of entries)
-    latest.set(
-      entry.folder_name,
-      Math.max(latest.get(entry.folder_name) ?? -Infinity, Date.parse(entry.updated_at)),
-    );
+  const labels = new Map<string, string>();
+  for (const entry of entries) {
+    const key = groupingKey(entry, grouping);
+    labels.set(key, groupLabel(entry, grouping));
+    latest.set(key, Math.max(latest.get(key) ?? -Infinity, Date.parse(entry.updated_at)));
+  }
+  const compare = (left: string, right: string) =>
+    labels.get(left)!.toLowerCase().localeCompare(labels.get(right)!.toLowerCase()) ||
+    left.localeCompare(right);
   return [...latest.keys()].sort((left, right) => {
-    if (order === 'project-directory-asc')
-      return left.toLowerCase().localeCompare(right.toLowerCase());
+    if (order === 'project-directory-asc') return compare(left, right);
     const difference = (latest.get(left) ?? 0) - (latest.get(right) ?? 0);
     return difference
       ? order === 'updated-at-asc'
         ? difference
         : -difference
-      : left.toLowerCase().localeCompare(right.toLowerCase());
+      : compare(left, right);
   });
 }
 

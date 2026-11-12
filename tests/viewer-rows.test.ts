@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countExpiryKeys, pointKey, viewerRows } from '../src/viewer/rows.ts';
+import { countExpiryKeys, pointKey, projectNames, viewerRows } from '../src/viewer/rows.ts';
 import type { StatusEntry } from '../src/shared/types.ts';
 
 const entry = (session: string, branch: string, times: (string | null)[]): StatusEntry => ({
@@ -86,55 +86,80 @@ test('count fade includes pending overflow and follows backend tie order with ti
   assert.deepEqual(tied, before);
 });
 
-test('header layouts show repository and branch and retain every point', () => {
-  const data = entries.map((item) => ({ ...item, repository: 'owner/repo' }));
-  const normal = viewerRows(data, ['demo']);
-  assert.equal(normal[0].kind === 'project' && normal[0].folder, 'demo');
-  assert.equal(normal[1].kind === 'branch' && normal[1].branch, 'owner/repo · main');
-  const flipped = viewerRows(
+test('repository grouping merges directories and sorts points within shared branches', () => {
+  const data = [
+    { ...entry('a', 'main', ['2026-11-03T01:00:00Z']), repository: 'owner/repo' },
+    {
+      ...entry('b', 'main', ['2026-11-03T02:00:00Z']),
+      folder_name: 'worktree',
+      repository: 'owner/repo',
+    },
+    { ...entry('c', 'feature', [null]), repository: 'owner/repo' },
+    { ...entry('d', 'main', [null]), repository: 'other/repo' },
+    { ...entry('e', 'main', [null]), folder_name: 'owner/repo' },
+  ];
+  const normal = viewerRows(data, projectNames(data, 'project-directory-asc'));
+  assert.equal(normal.filter((r) => r.kind === 'project').length, 3);
+  const rows = viewerRows(
     data,
-    ['demo'],
+    projectNames(data, 'project-directory-asc', 'repository'),
     'submitted-at-desc',
-    'repository-branch',
-    'project-directory',
+    'repository',
   );
-  assert.equal(flipped[0].kind === 'project' && flipped[0].folder, 'owner/repo · main');
-  assert.equal(flipped[1].kind === 'branch' && flipped[1].branch, 'demo');
-  assert.equal(flipped.filter((r) => r.kind === 'project').length, 2);
+  const titles = rows.filter((r) => r.kind === 'project');
+  assert.equal(titles.length, 3);
+  assert.equal(new Set(titles.map((r) => r.key)).size, 3);
+  const repoStart = rows.findIndex((r) => r.kind === 'point' && r.point.text === 'b0') - 2;
+  assert(repoStart >= 0);
   assert.deepEqual(
-    flipped.filter((r) => r.kind === 'point'),
-    normal.filter((r) => r.kind === 'point'),
+    rows.slice(repoStart + 2, repoStart + 4).map((r) => r.kind === 'point' && r.point.text),
+    ['b0', 'a0'],
   );
-  const legacy = viewerRows(
-    entries,
-    ['demo'],
-    'submitted-at-desc',
-    'repository-branch',
-    'project-directory',
-  );
-  assert.equal(legacy[0].kind === 'project' && legacy[0].folder, 'main');
+  assert.equal(rows.filter((r) => r.kind === 'point').length, 5);
+  for (const row of rows.filter((r) => r.kind === 'point')) {
+    assert.equal(row.entry.points[row.pointIndex], row.point);
+    assert(normal.some((other) => other.key === row.key));
+  }
+  assert.deepEqual(projectNames(data, 'updated-at-desc', 'repository').length, 3);
 });
 
-test('title and subtitle are independent, and None omits subtitle rows', () => {
-  const data = entries.map((item) => ({ ...item, repository: 'owner/repo' }));
-  for (const title of ['project-directory', 'repository-branch'] as const) {
-    for (const subtitle of ['project-directory', 'repository-branch', 'none'] as const) {
-      const rows = viewerRows(data, ['demo'], 'submitted-at-desc', title, subtitle);
-      const titles = rows.filter((row) => row.kind === 'project');
-      const subtitles = rows.filter((row) => row.kind === 'branch');
-      assert.equal(titles[0].folder, title === 'project-directory' ? 'demo' : 'owner/repo · main');
-      if (subtitle === 'none') assert.deepEqual(subtitles, []);
-      else {
-        assert.equal(subtitles.length, 2);
-        assert.equal(
-          subtitles[0].branch,
-          subtitle === 'project-directory' ? 'demo' : 'owner/repo · main',
-        );
-      }
-      assert.deepEqual(
-        rows.filter((row) => row.kind === 'point'),
-        viewerRows(data, ['demo']).filter((row) => row.kind === 'point'),
-      );
-    }
-  }
+test('missing repositories fall back to separate directories', () => {
+  const data = [
+    entry('a', 'main', [null]),
+    { ...entry('b', 'main', [null]), folder_name: 'second' },
+  ];
+  const rows = viewerRows(
+    data,
+    projectNames(data, 'project-directory-asc', 'repository'),
+    'submitted-at-desc',
+    'repository',
+  );
+  assert.deepEqual(
+    rows.filter((r) => r.kind === 'project').map((r) => r.folder),
+    ['demo', 'second'],
+  );
+  assert.deepEqual(
+    rows.filter((r) => r.kind === 'branch').map((r) => r.branch),
+    ['main', 'main'],
+  );
+});
+
+test('repository order uses the latest update across all its directories', () => {
+  const data = [
+    { ...entry('a', 'main', [null]), repository: 'owner/a', updated_at: '2026-11-01T00:00:00Z' },
+    { ...entry('b', 'main', [null]), repository: 'owner/b', updated_at: '2026-11-02T00:00:00Z' },
+    {
+      ...entry('c', 'main', [null]),
+      repository: 'owner/a',
+      folder_name: 'worktree',
+      updated_at: '2026-11-03T00:00:00Z',
+    },
+  ];
+  const labels = (order: 'updated-at-desc' | 'updated-at-asc' | 'project-directory-asc') =>
+    viewerRows(data, projectNames(data, order, 'repository'), 'submitted-at-desc', 'repository')
+      .filter((r) => r.kind === 'project')
+      .map((r) => r.folder);
+  assert.deepEqual(labels('updated-at-desc'), ['owner/a', 'owner/b']);
+  assert.deepEqual(labels('updated-at-asc'), ['owner/b', 'owner/a']);
+  assert.deepEqual(labels('project-directory-asc'), ['owner/a', 'owner/b']);
 });
