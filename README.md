@@ -30,6 +30,20 @@ Status data stays on your machine. The bundled MCP server receives reports even 
 
 Reporting requires a real session ID from the agent client. Configuration alone does not prove reporting works; confirm that your first update appears in the board.
 
+## Installing on macOS
+
+Download the `.dmg` from [Releases](https://github.com/Vivek-Raman/Sideglance/releases), open it, and drag Sideglance into Applications.
+
+Sideglance is not signed with an Apple Developer ID or notarized by Apple. macOS may say the app is "damaged" and suggest moving it to the Trash.
+
+If you downloaded this copy from this repository's official GitHub release, open Terminal and run:
+
+```sh
+xattr -rd com.apple.quarantine /Applications/Sideglance.app
+```
+
+Then open Sideglance again. This removes the download quarantine for Sideglance only, allowing it to open without Apple's normal first-launch verification. Only do this for a copy you trust.
+
 ## Agent integrations
 
 Settings can install both the skill and MCP registration for Codex, Claude Code, Antigravity, and OpenCode. Cursor has MCP registration support; Gemini has skill installation support. These partial integrations require additional setup for reporting.
@@ -48,7 +62,7 @@ The app identifier has changed, so operating-system window placement and permiss
 
 Select **Check for updates** in Settings to look for a newer stable release. Sideglance downloads and verifies a signed update before installing it. Windows restarts through its installer. macOS and Linux ask you to restart Sideglance after installation.
 
-The first macOS installation still needs the quarantine command in the release notes because Sideglance is not notarized. The updater is designed to avoid repeating that command, but verify this on your macOS version before relying on it. Linux self-updates apply to the AppImage bundle. Installations managed by a package manager should update through that package manager.
+The first macOS installation still needs the [quarantine command above](#installing-on-macos) because Sideglance is not notarized. The updater is designed to avoid repeating that command, but verify this on your macOS version before relying on it. Linux self-updates apply to the AppImage bundle. Installations managed by a package manager should update through that package manager.
 
 ## Development
 

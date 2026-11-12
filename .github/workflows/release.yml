@@ -81,18 +81,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const { execFileSync } = require('node:child_process');
-
-          const tag = process.env.RELEASE_TAG;
-          const body = execFileSync('gh', ['release', 'view', tag, '--json', 'body', '--jq', '.body'], { encoding: 'utf8' }).trim();
-          const instructions = fs.readFileSync('.github/RELEASE_TEMPLATE.md', 'utf8').trim();
-          if (!body.includes('## Installing on macOS')) {
-            fs.writeFileSync('release-notes.md', [body, instructions].filter(Boolean).join('\n\n'));
-            execFileSync('gh', ['release', 'edit', tag, '--notes-file', 'release-notes.md'], { stdio: 'inherit' });
-          }
-          NODE
           gh release download "$RELEASE_TAG" --pattern '*.sig' --dir updater-signatures
           RELEASE_TAG="$RELEASE_TAG" node <<'NODE'
           const fs = require('node:fs');
