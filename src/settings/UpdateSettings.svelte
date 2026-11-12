@@ -23,7 +23,8 @@
   });
 
   async function checkForUpdates() {
-    if (state.status === 'checking' || state.status === 'downloading') return;
+    if (import.meta.env.DEV || state.status === 'checking' || state.status === 'downloading')
+      return;
     const currentVersion = state.currentVersion;
     state = { status: 'checking', currentVersion };
     update = null;
@@ -50,7 +51,7 @@
   }
 
   async function downloadAndInstall() {
-    if (!update || state.status !== 'available') return;
+    if (import.meta.env.DEV || !update || state.status !== 'available') return;
     const { currentVersion, version } = state;
     state = { status: 'downloading', currentVersion, version, downloaded: 0, contentLength: null };
     try {
@@ -92,6 +93,7 @@
     <h2>Updates</h2>
     <p>Version {state.currentVersion || 'Loading…'}</p>
   </div>
+  {#if import.meta.env.DEV}<p class="status">Updates are disabled in development mode.</p>{/if}
   {#if state.status === 'available'}
     <p>
       Version {state.version} is ready. Installing closes Sideglance and starts the new version.
@@ -99,16 +101,20 @@
     {#if state.notes}
       <div class="release-notes">{@html renderReleaseNotes(state.notes)}</div>
     {/if}
-    <button onclick={() => void downloadAndInstall()}>Download and install</button>
+    <button disabled={import.meta.env.DEV} onclick={() => void downloadAndInstall()}
+      >Download and install</button
+    >
   {:else if state.status === 'downloading'}
     <p>{progressLabel()}</p>
   {:else if state.status === 'ready-to-restart'}
     <p>Version {state.version} is installed. Restart Sideglance to use it.</p>
-    <button onclick={() => void command('restart_app')}>Restart Sideglance</button>
+    <button disabled={import.meta.env.DEV} onclick={() => void command('restart_app')}
+      >Restart Sideglance</button
+    >
   {:else}
     <button
       onclick={() => void checkForUpdates()}
-      disabled={state.status === 'checking' || !state.currentVersion}
+      disabled={import.meta.env.DEV || state.status === 'checking' || !state.currentVersion}
     >
       {state.status === 'checking' ? 'Checking…' : 'Check for updates'}
     </button>

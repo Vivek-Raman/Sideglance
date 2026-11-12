@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { check } from '@tauri-apps/plugin-updater';
+  import { startUpdateSchedule } from '../shared/update-schedule';
   import { countExpiryKeys, pointKey, projectNames, relativeTime, viewerRows } from './rows';
   import { onMount, tick } from 'svelte';
   import { fly } from 'svelte/transition';
@@ -17,6 +19,7 @@
   const controller = new ViewerController(timers, motion);
   const textScales = [0.85, 1, 1.15, 1.35];
   const themes = ['system', 'light', 'dark'] as const;
+  let availableVersion: string | null = null;
   let windowFocused = true;
   let now = controller.state.now;
   let entries = controller.state.entries;
@@ -151,6 +154,16 @@
     systemTheme.addEventListener('change', onThemeChange);
     document.addEventListener('selectionchange', onSelection);
     let tornDown = false;
+    const stopUpdateChecks = import.meta.env.DEV
+      ? () => {}
+      : startUpdateSchedule(async () => {
+          const update = await check({ timeout: 30_000 });
+          try {
+            if (!tornDown) availableVersion = update?.version ?? null;
+          } finally {
+            await update?.close();
+          }
+        });
     const unsubscribeController = controller.subscribe((next) => {
       ({ entries, settings, pendingRemoval, dismissing, undoCount, undoing, statusError, now } =
         next);
@@ -191,6 +204,7 @@
     });
     return () => {
       tornDown = true;
+      stopUpdateChecks();
       window.removeEventListener('keydown', onKeyDown);
       if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
       window.clearInterval(refreshNow);
@@ -302,6 +316,14 @@
     <span class="development-label">dev</span>
   {/if}
   <div class="document-actions" class:window-unfocused={!windowFocused}>
+    {#if !import.meta.env.DEV && availableVersion}
+      <button
+        class="update-button"
+        aria-label="Update available"
+        title={`Version ${availableVersion} is available. Open Settings to update.`}
+        onclick={() => void command('open_settings')}>Update</button
+      >
+    {/if}
     <button
       class="icon-button"
       onclick={() => void cycleTheme()}
@@ -558,6 +580,13 @@
   .document-actions button {
     padding: 0.28rem 0.5rem;
     font-size: 0.7rem;
+  }
+  .document-actions .update-button {
+    border-radius: 999px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(28px) saturate(1.15);
+    -webkit-backdrop-filter: blur(28px) saturate(1.15);
   }
   .document-actions button:not(:disabled):hover {
     border-color: var(--border);
