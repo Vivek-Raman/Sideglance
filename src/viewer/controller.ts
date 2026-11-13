@@ -1,7 +1,22 @@
 import type { Settings, Snapshot, StatusEntry, StatusPoint } from '../shared/types';
 
+// Browser timeouts use a signed 32-bit millisecond delay.
+export const MAX_TIMEOUT_MS = 2_147_483_647;
+export const EXPIRY_WARNING_MS = 10 * 60_000;
+
+export function expiryWarningAt(submittedAt: string, minutes: number): number {
+  return Date.parse(submittedAt) + minutes * 60_000 - EXPIRY_WARNING_MS;
+}
+
+export function expirySoon(submittedAt: string, minutes: number | null, now: number): boolean {
+  return minutes != null && expiryWarningAt(submittedAt, minutes) <= now;
+}
+
 export type ViewerState = {
   revision: number;
+  health: Snapshot['health'];
+  lastSuccessfulReadAt: string | null;
+  recoveryWarning: string | null;
   entries: StatusEntry[];
   settings: Settings | null;
   pendingSnapshot: Snapshot | null;
@@ -40,6 +55,9 @@ type DismissArgs = {
 };
 const initialState = (): ViewerState => ({
   revision: -1,
+  health: 'waiting',
+  lastSuccessfulReadAt: null,
+  recoveryWarning: null,
   entries: [],
   settings: null,
   pendingSnapshot: null,
@@ -185,7 +203,11 @@ export class ViewerController {
       (this.state.pendingSnapshot && value.revision < this.state.pendingSnapshot.revision)
     )
       return;
+    this.state.health = value.health;
+    this.state.lastSuccessfulReadAt = value.last_successful_read_at ?? null;
+    this.state.recoveryWarning = value.recovery_warning ?? null;
     this.state.pendingSnapshot = value;
+    this.notify();
     this.flushPending();
   }
   setSelection(selected: boolean) {
@@ -324,35 +346,31 @@ export class ViewerController {
     );
   }
   expirySoon(value: string) {
-    const minutes = this.state.settings?.autoClearAfterMinutes;
-    return (
-      minutes != null &&
-      new Date(value).getTime() + minutes * 60_000 - this.state.now <= 10 * 60_000
-    );
+    return expirySoon(value, this.state.settings?.autoClearAfterMinutes ?? null, this.state.now);
   }
   private scheduleExpiry() {
     if (this.expiryTimer !== undefined) this.timers.clearTimeout(this.expiryTimer);
     this.expiryTimer = undefined;
+    this.state.now = this.timers.now();
     const minutes = this.state.settings?.autoClearAfterMinutes;
     if (minutes == null) return;
-    const next = this.state.entries
-      .flatMap((entry) =>
-        entry.points
-          .filter((point) => !point.pinned)
-          .map(
-            (point) =>
-              new Date(point.submitted_at ?? entry.updated_at).getTime() +
-              minutes * 60_000 -
-              10 * 60_000,
-          ),
-      )
-      .filter((time) => time > this.state.now)
-      .sort((a, b) => a - b)[0];
-    if (next === undefined) return;
-    this.expiryTimer = this.timers.setTimeout(() => {
-      this.expiryTimer = undefined;
-      this.refreshNow();
-    }, next - this.state.now);
+    let next = Infinity;
+    for (const entry of this.state.entries) {
+      for (const point of entry.points) {
+        if (point.pinned) continue;
+        const time = expiryWarningAt(point.submitted_at ?? entry.updated_at, minutes);
+        if (time > this.state.now) next = Math.min(next, time);
+      }
+    }
+    if (!Number.isFinite(next)) return;
+    this.expiryTimer = this.timers.setTimeout(
+      () => {
+        this.expiryTimer = undefined;
+        // A capped timeout or a wall-clock change requires another calculation.
+        this.refreshNow();
+      },
+      Math.min(MAX_TIMEOUT_MS, next - this.state.now),
+    );
   }
   dismiss(
     entry: StatusEntry,

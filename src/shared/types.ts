@@ -27,6 +27,16 @@ export type Snapshot = {
   health: 'waiting' | 'current' | 'stale' | 'error';
   error: string | null;
   modified_at: string | null;
+  last_successful_read_at?: string | null;
+  recovery_warning?: string | null;
+};
+
+export type RemovedPoint = {
+  id: string;
+  entry: StatusEntry;
+  point_index: number;
+  removed_at: string;
+  reason: string;
 };
 
 export type AgentInstallation = {
@@ -34,6 +44,7 @@ export type AgentInstallation = {
   name: string;
   skillInstalled: boolean;
   mcpRegistered: boolean;
+  configurationValid?: boolean;
   available: boolean;
   configPath: string;
   error: string | null;

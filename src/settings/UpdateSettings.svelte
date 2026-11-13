@@ -1,4 +1,5 @@
 <script lang="ts">
+  import './settings-card.css';
   import { getVersion } from '@tauri-apps/api/app';
   import { check, type Update } from '@tauri-apps/plugin-updater';
   import { onMount } from 'svelte';
@@ -6,8 +7,12 @@
   import { renderReleaseNotes } from './release-notes';
   import type { UpdateState } from '../shared/types';
 
+  export let updatesEnabled = !import.meta.env.DEV;
+
   let state: UpdateState = { status: 'idle', currentVersion: '' };
   let update: Update | null = null;
+  let disposed = false;
+  let generation = 0;
 
   function errorText(error: unknown) {
     return error instanceof Error ? error.message : String(error);
@@ -15,21 +20,42 @@
 
   onMount(() => {
     void getVersion()
-      .then((currentVersion) => (state = { status: 'idle', currentVersion }))
-      .catch(
-        (error) =>
-          (state = { status: 'error', currentVersion: 'Unknown', message: errorText(error) }),
-      );
+      .then((currentVersion) => {
+        if (!disposed) state = { status: 'idle', currentVersion };
+      })
+      .catch((error) => {
+        if (!disposed)
+          state = { status: 'error', currentVersion: 'Unknown', message: errorText(error) };
+      });
+    return () => {
+      disposed = true;
+      generation++;
+      const resource = update;
+      update = null;
+      void resource?.close().catch(() => undefined);
+    };
   });
 
   async function checkForUpdates() {
-    if (import.meta.env.DEV || state.status === 'checking' || state.status === 'downloading')
+    if (
+      disposed ||
+      !updatesEnabled ||
+      state.status === 'checking' ||
+      state.status === 'downloading'
+    )
       return;
     const currentVersion = state.currentVersion;
     state = { status: 'checking', currentVersion };
+    const request = ++generation;
+    const previous = update;
     update = null;
+    await previous?.close().catch(() => undefined);
     try {
-      const result = await check();
+      const result = await check({ timeout: 30_000 });
+      if (disposed || generation !== request) {
+        await result?.close();
+        return;
+      }
       if (!result) {
         state = { status: 'up-to-date', currentVersion };
         return;
@@ -42,6 +68,7 @@
         notes: result.body?.trim() || null,
       };
     } catch (error) {
+      if (disposed || generation !== request) return;
       state = {
         status: 'error',
         currentVersion,
@@ -51,11 +78,14 @@
   }
 
   async function downloadAndInstall() {
-    if (import.meta.env.DEV || !update || state.status !== 'available') return;
+    if (disposed || !updatesEnabled || !update || state.status !== 'available') return;
     const { currentVersion, version } = state;
+    const resource = update;
+    update = null;
     state = { status: 'downloading', currentVersion, version, downloaded: 0, contentLength: null };
     try {
-      await update.downloadAndInstall((event) => {
+      await resource.downloadAndInstall((event) => {
+        if (disposed) return;
         if (event.event === 'Started') {
           state = {
             status: 'downloading',
@@ -68,16 +98,16 @@
           state = { ...state, downloaded: state.downloaded + event.data.chunkLength };
         }
       });
-      state = { status: 'ready-to-restart', currentVersion, version };
+      if (!disposed) state = { status: 'ready-to-restart', currentVersion, version };
     } catch (error) {
+      if (disposed) return;
       state = {
         status: 'error',
         currentVersion,
         message: `Could not install the update: ${errorText(error)}`,
       };
     } finally {
-      await update?.close().catch(() => undefined);
-      update = null;
+      await resource.close().catch(() => undefined);
     }
   }
 
@@ -93,28 +123,37 @@
     <h2>Updates</h2>
     <p>Version {state.currentVersion || 'Loading…'}</p>
   </div>
-  {#if import.meta.env.DEV}<p class="status">Updates are disabled in development mode.</p>{/if}
+  {#if !updatesEnabled}<p class="status">Updates are disabled in development mode.</p>{/if}
   {#if state.status === 'available'}
     <p>
-      Version {state.version} is ready. Installing closes Sideglance and starts the new version.
+      Version {state.version} is ready. Installing may close Sideglance. Restart existing agent sessions
+      after updating.
     </p>
     {#if state.notes}
       <div class="release-notes">{@html renderReleaseNotes(state.notes)}</div>
     {/if}
-    <button disabled={import.meta.env.DEV} onclick={() => void downloadAndInstall()}
+    <button disabled={!updatesEnabled} onclick={() => void downloadAndInstall()}
       >Download and install</button
     >
   {:else if state.status === 'downloading'}
     <p>{progressLabel()}</p>
   {:else if state.status === 'ready-to-restart'}
     <p>Version {state.version} is installed. Restart Sideglance to use it.</p>
-    <button disabled={import.meta.env.DEV} onclick={() => void command('restart_app')}
-      >Restart Sideglance</button
+    <button
+      disabled={!updatesEnabled}
+      onclick={() =>
+        void command('restart_app').catch((error) => {
+          state = {
+            status: 'error',
+            currentVersion: state.currentVersion,
+            message: errorText(error),
+          };
+        })}>Restart Sideglance</button
     >
   {:else}
     <button
       onclick={() => void checkForUpdates()}
-      disabled={import.meta.env.DEV || state.status === 'checking' || !state.currentVersion}
+      disabled={!updatesEnabled || state.status === 'checking' || !state.currentVersion}
     >
       {state.status === 'checking' ? 'Checking…' : 'Check for updates'}
     </button>
@@ -124,15 +163,6 @@
 </section>
 
 <style>
-  .settings-group {
-    display: grid;
-    gap: 1rem;
-    min-width: 0;
-    margin: 0 0 24px;
-    padding: 1.1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.65rem;
-  }
   h2 {
     margin: 0;
     font-size: 1rem;

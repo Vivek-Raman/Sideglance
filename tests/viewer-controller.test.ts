@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ViewerController, type TimerApi, type ViewerMotion } from '../src/viewer/controller.ts';
+import {
+  MAX_TIMEOUT_MS,
+  expirySoon,
+  ViewerController,
+  type TimerApi,
+  type ViewerMotion,
+} from '../src/viewer/controller.ts';
 import type { Settings, Snapshot, StatusEntry } from '../src/shared/types.ts';
 
 const settings: Settings = {
@@ -54,7 +60,15 @@ function clock(reduced = false) {
       nextDue = [...timers.entries()].sort((a, b) => a[1].due - b[1].due)[0];
     }
   }
-  return { api, advance, pending: () => timers.size };
+  return {
+    api,
+    advance,
+    pending: () => timers.size,
+    delays: () => [...timers.values()].map(({ due }) => due - now),
+    jump: (ms: number) => {
+      now += ms;
+    },
+  };
 }
 
 test('queued newest revision commits after the hold and notifies subscribers', async () => {
@@ -715,4 +729,85 @@ test('undo requested during dismissal waits for removal and then restores', asyn
   assert.equal(restored, true);
   assert.equal(controller.state.undoCount, 0);
   controller.dispose();
+});
+
+async function expiryFixture(minutes: number, pinned = false) {
+  const fake = clock(true);
+  const controller = new ViewerController(fake.api);
+  const submittedAt = new Date(fake.api.now()).toISOString();
+  const fresh: StatusEntry = {
+    ...entry,
+    updated_at: submittedAt,
+    points: [{ ...entry.points[0], submitted_at: submittedAt, pinned }],
+  };
+  controller.acceptSettings({ ...settings, autoClearAfterMinutes: minutes });
+  controller.acceptSnapshot(snapshot(1, [fresh]));
+  fake.advance(0);
+  await microtasks();
+  return { fake, controller, fresh };
+}
+
+test('30-day expiry is capped and rearmed for the remaining warning deadline', async () => {
+  const { fake, controller, fresh } = await expiryFixture(43_200);
+  assert.deepEqual(fake.delays(), [MAX_TIMEOUT_MS]);
+  fake.advance(MAX_TIMEOUT_MS);
+  const remaining = 43_200 * 60_000 - 10 * 60_000 - MAX_TIMEOUT_MS;
+  assert.deepEqual(fake.delays(), [remaining]);
+  assert.equal(controller.expirySoon(fresh.updated_at), false);
+  fake.advance(remaining);
+  assert.equal(controller.expirySoon(fresh.updated_at), true);
+  assert.equal(fake.pending(), 0);
+  controller.dispose();
+});
+
+test('expiry recalculates after forward and backward wall-clock changes', async () => {
+  const { fake, controller, fresh } = await expiryFixture(20);
+  fake.jump(-5 * 60_000);
+  controller.refreshNow();
+  assert.deepEqual(fake.delays(), [15 * 60_000]);
+  fake.jump(30 * 60_000);
+  controller.refreshNow();
+  assert.equal(controller.expirySoon(fresh.updated_at), true);
+  assert.equal(fake.pending(), 0);
+  controller.dispose();
+});
+
+test('pinned and overdue points do not schedule warning timers', async () => {
+  const pinned = await expiryFixture(43_200, true);
+  assert.equal(pinned.fake.pending(), 0);
+  pinned.controller.dispose();
+  const overdue = await expiryFixture(1);
+  assert.equal(overdue.fake.pending(), 0);
+  assert.equal(overdue.controller.expirySoon(overdue.fresh.updated_at), true);
+  overdue.controller.dispose();
+});
+
+test('snapshot replacement, disabling retention and disposal cancel the expiry timer', async () => {
+  const { fake, controller } = await expiryFixture(43_200);
+  controller.acceptSnapshot(snapshot(2, []));
+  fake.advance(0);
+  await microtasks();
+  assert.equal(fake.pending(), 0);
+  controller.acceptSnapshot(
+    snapshot(3, [{ ...entry, updated_at: new Date(fake.api.now()).toISOString() }]),
+  );
+  fake.advance(0);
+  await microtasks();
+  assert.equal(fake.pending(), 1);
+  controller.acceptSettings(settings);
+  fake.advance(0);
+  await microtasks();
+  assert.equal(fake.pending(), 0);
+  controller.acceptSettings({ ...settings, autoClearAfterMinutes: 43_200 });
+  assert.equal(fake.pending(), 1);
+  controller.dispose();
+  assert.equal(fake.pending(), 0);
+});
+
+test('expiry helper preserves the ten-minute warning boundary and disabled retention', () => {
+  const at = '2026-11-12T00:00:00Z';
+  const warning = Date.parse(at) + 10 * 60_000;
+  assert.equal(expirySoon(at, 20, warning - 1), false);
+  assert.equal(expirySoon(at, 20, warning), true);
+  assert.equal(expirySoon(at, null, warning), false);
 });
