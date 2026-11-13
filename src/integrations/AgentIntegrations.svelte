@@ -8,12 +8,33 @@
   let skill: SkillInstallation | null = null;
   let installingSkill: string | null = null;
   let installingMcp: string | null = null;
+  let testingMcp: string | null = null;
+  let testResults: Record<string, string> = {};
+  let disposed = false;
+  async function testConnection(harness: string) {
+    if (testingMcp || installingMcp) return;
+    testingMcp = harness;
+    try {
+      const result = await command('test_mcp_connection', { harness });
+      if (!disposed)
+        testResults = {
+          ...testResults,
+          [harness]: `${result.status === 'connected' ? 'Connected' : 'Connection needs attention'}: ${result.message}`,
+        };
+    } catch (error) {
+      if (!disposed) onError(error);
+    } finally {
+      if (!disposed) testingMcp = null;
+    }
+  }
+
   async function installSkill(target: string) {
     installingSkill = target;
     try {
-      skill = await command('install_skill_for_target', { target });
+      const value = await command('install_skill_for_target', { target });
+      if (!disposed) skill = value;
     } catch (error) {
-      onError(error);
+      if (!disposed) onError(error);
     } finally {
       installingSkill = null;
     }
@@ -21,19 +42,36 @@
   async function toggleMcp(harness: string, registered: boolean) {
     installingMcp = harness;
     try {
-      skill = await command(registered ? 'uninstall_mcp_for_harness' : 'install_mcp_for_harness', {
-        harness,
-      });
+      const value = await command(
+        registered ? 'uninstall_mcp_for_harness' : 'install_mcp_for_harness',
+        {
+          harness,
+        },
+      );
+      if (!disposed) {
+        skill = value;
+        testResults = {
+          ...testResults,
+          [harness]: 'Configuration updated. Restart existing agent sessions to load it.',
+        };
+      }
     } catch (error) {
-      onError(error);
+      if (!disposed) onError(error);
     } finally {
       installingMcp = null;
     }
   }
   onMount(() => {
     void command('get_skill_installation')
-      .then((value) => (skill = value))
-      .catch(onError);
+      .then((value) => {
+        if (!disposed) skill = value;
+      })
+      .catch((error) => {
+        if (!disposed) onError(error);
+      });
+    return () => {
+      disposed = true;
+    };
   });
 </script>
 
@@ -42,7 +80,8 @@
     <h2>Agent integration</h2>
     <p>
       Install the bundled skill into the locations used by each agent, then configure MCP separately
-      when needed.
+      when needed. After installing or updating, restart existing agent sessions. Test connection
+      opens a new read-only connection; it does not reload those sessions.
     </p>
   </div>
   {#if skill}<div class="skill-targets" aria-label="Skill installation targets">
@@ -65,7 +104,10 @@
     <div class="agent-status" aria-label="Agent integration status">
       {#each skill.agents as agent}<McpAgentRow
           {agent}
-          busy={installingMcp !== null}
+          busy={installingMcp !== null || testingMcp !== null}
+          onTest={(id) => void testConnection(id)}
+          onRepair={(id) => void toggleMcp(id, false)}
+          testResult={testResults[agent.id] ?? ''}
           onToggle={(id, registered) => void toggleMcp(id, registered)}
         />{/each}
     </div>
@@ -74,7 +116,10 @@
         <div class="agent-status">
           {#each skill.additionalAgents as agent}<McpAgentRow
               {agent}
-              busy={installingMcp !== null}
+              busy={installingMcp !== null || testingMcp !== null}
+              onTest={(id) => void testConnection(id)}
+              onRepair={(id) => void toggleMcp(id, false)}
+              testResult={testResults[agent.id] ?? ''}
               onToggle={(id, registered) => void toggleMcp(id, registered)}
             />{/each}
         </div>

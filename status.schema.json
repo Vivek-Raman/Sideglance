@@ -121,7 +121,7 @@
         "submitted_at": {
           "type": "string",
           "format": "date-time",
-          "description": "RFC 3339 timestamp. Existing point IDs retain their timestamp when omitted on edit; a valid caller-supplied timestamp is preserved."
+          "description": "Storage-only RFC 3339 timestamp. Existing point IDs retain their submitted time. MCP tool payloads do not accept this field."
         },
         "id": {
           "type": "string",
@@ -130,7 +130,8 @@
         },
         "pinned": {
           "type": "boolean",
-          "default": false
+          "default": false,
+          "description": "Accepted only for migration from the inline-pin format. New shared-file writes omit this field; user pins are stored privately."
         }
       }
     }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RetentionPreview from './RetentionPreview.svelte';
   import { command } from '../shared/commands';
   import type { Settings } from '../shared/types';
   export let settings: Settings;
@@ -69,7 +70,12 @@
       />
     </label>
     {#if confirmation}
-      <button onclick={() => void save()} disabled={saving || pending}>Apply count limit</button>
+      <RetentionPreview
+        autoClearAfterMinutes={settings.autoClearAfterMinutes}
+        maxStatusItemsPerProject={count}
+        disabled={saving || pending}
+        onApply={save}
+      />
     {/if}
   {/if}
 </div>
@@ -95,16 +101,5 @@
     color: var(--text);
     background: var(--bg);
     font: inherit;
-  }
-  button {
-    justify-self: start;
-    border: 0;
-    border-radius: 0.4rem;
-    padding: 0.5rem 0.7rem;
-    color: #111;
-    background: #f2f2f2;
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 600;
   }
 </style>

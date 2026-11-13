@@ -1,8 +1,11 @@
 <script lang="ts">
+  import './settings-card.css';
+  import RetentionPreview from './RetentionPreview.svelte';
   import CountRetentionSettings from './CountRetentionSettings.svelte';
   import { command } from '../shared/commands';
   import {
     beginRetentionSave,
+    draftMinutes,
     completeRetentionSave,
     editRetentionDraft,
     reconcileRetentionDraft,
@@ -123,24 +126,19 @@
           ><option value="minutes">Minutes</option><option value="hours">Hours</option></select
         >
       </div>
-      {#if draft.confirmation}<button
-          class="confirm-auto-clear"
-          onclick={() => void save()}
-          disabled={saving || savingRequest}>Apply shorter retention</button
-        >{/if}{/if}
+      {#if draft.confirmation}
+        <RetentionPreview
+          autoClearAfterMinutes={draftMinutes(draft)}
+          maxStatusItemsPerProject={settings.maxStatusItemsPerProject}
+          disabled={saving || savingRequest}
+          onApply={save}
+        />
+      {/if}{/if}
     <CountRetentionSettings {settings} {saving} {resetVersion} {onError} />
   </div>
 </section>
 
 <style>
-  .settings-group {
-    display: grid;
-    gap: 1rem;
-    margin: 0 0 24px;
-    padding: 1.1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.65rem;
-  }
   .settings-group h2,
   .settings-group h3 {
     margin: 0;
@@ -191,16 +189,6 @@
   }
   .auto-clear-controls input {
     width: 7rem;
-  }
-  button {
-    border: 0;
-    border-radius: 0.4rem;
-    padding: 0.5rem 0.7rem;
-    color: #111;
-    background: #f2f2f2;
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 600;
   }
   @media (max-width: 520px) {
     .setting-row {

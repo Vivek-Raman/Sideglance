@@ -58,3 +58,31 @@ test('disposal during an in-flight check prevents rescheduling', async () => {
   await Promise.resolve();
   assert.equal(scheduled, false);
 });
+
+test('deferred launch leaves the initial check to the user and schedules background checks', async () => {
+  let checks = 0;
+  let callback: () => void = () => {};
+  const delays: number[] = [];
+  const stop = startUpdateSchedule(
+    async () => {
+      checks++;
+    },
+    {
+      setTimeout: (fn, delay) => {
+        callback = fn;
+        delays.push(delay);
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeout: () => {},
+      random: () => 0,
+    },
+    { immediate: false },
+  );
+  assert.equal(checks, 0);
+  assert.deepEqual(delays, [10_801_000]);
+  callback();
+  await Promise.resolve();
+  assert.equal(checks, 1);
+  assert.equal(delays.length, 2);
+  stop();
+});

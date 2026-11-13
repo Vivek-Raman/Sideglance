@@ -1,8 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Settings, SkillInstallation, Snapshot, StatusEntry } from './types';
+import type { RemovedPoint, Settings, SkillInstallation, Snapshot, StatusEntry } from './types';
 
 type CommandMap = {
+  test_mcp_connection: {
+    args: { harness: string };
+    result: { status: 'connected' | 'invalid' | 'error'; message: string };
+  };
   get_snapshot: { args: undefined; result: Snapshot };
+  get_recently_removed: { args: undefined; result: RemovedPoint[] };
+  restore_removed: { args: { id: string }; result: void };
+  preview_retention: {
+    args: { autoClearAfterMinutes: number | null; maxStatusItemsPerProject: number | null };
+    result: number;
+  };
   get_settings: { args: undefined; result: Settings };
   reset_settings: { args: undefined; result: Settings };
   open_settings: { args: undefined; result: void };

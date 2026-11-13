@@ -7,7 +7,7 @@ export function needsShorterRetentionConfirmation(
   next: number | null,
   applied: number | null,
 ): boolean {
-  return next !== null && applied !== null && next < applied;
+  return next !== null && (applied === null || next < applied);
 }
 
 export type RetentionDraft = {

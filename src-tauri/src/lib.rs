@@ -17,6 +17,10 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             desktop::commands::get_snapshot,
+            desktop::commands::test_mcp_connection,
+            desktop::commands::get_recently_removed,
+            desktop::commands::restore_removed,
+            desktop::commands::preview_retention,
             desktop::commands::dismiss_point,
             desktop::commands::set_point_pinned,
             desktop::commands::restore_point,
