@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use tauri::{AppHandle, Manager, State};
 
 use crate::{
@@ -15,6 +18,10 @@ use crate::{
     preferences::{Settings, SettingsOwner},
     status::snapshot::{update, Snapshot, ViewerState},
 };
+
+// Hold across both persistence and the native enqueue so pin changes and resets
+// reach the window in the same order as their settings commits.
+static PIN_STATE_COORDINATOR: Mutex<()> = Mutex::new(());
 
 // Filesystem operations, process waits and status locks never occupy the UI thread.
 async fn blocking<T: Send + 'static>(
@@ -149,11 +156,15 @@ pub(crate) async fn reset_settings(
     let owner = owner.inner().clone();
     let state = state.inner().clone();
     blocking(move || {
+        let pin_guard = PIN_STATE_COORDINATOR
+            .lock()
+            .map_err(|error| error.to_string())?;
         let settings = owner.reset()?;
         app.get_webview_window("main")
             .ok_or_else(|| "Main window unavailable".to_string())?
             .set_always_on_top(settings.pinned)
             .map_err(|error| error.to_string())?;
+        drop(pin_guard);
         update(&app, &state);
         Ok(settings)
     })
@@ -271,6 +282,9 @@ pub(crate) async fn set_pinned(
 ) -> Result<(), String> {
     let owner = owner.inner().clone();
     blocking(move || {
+        let _pin_guard = PIN_STATE_COORDINATOR
+            .lock()
+            .map_err(|error| error.to_string())?;
         owner.set_pinned(pinned)?;
         app.get_webview_window("main")
             .ok_or_else(|| "Main window unavailable".to_string())?

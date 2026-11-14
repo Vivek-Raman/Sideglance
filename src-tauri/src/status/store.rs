@@ -153,7 +153,9 @@ impl StatusStore {
         loop {
             match file.try_lock_exclusive() {
                 Ok(()) => return Ok(SidecarLock { file }),
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                Err(error)
+                    if error.raw_os_error() == fs2::lock_contended_error().raw_os_error() =>
+                {
                     if Instant::now() >= deadline {
                         return Err(StatusError::LockTimeout("Status file is busy. Retry shortly; another process is holding its lock.".into()));
                     }
@@ -443,7 +445,10 @@ impl StatusStore {
                                 .get("points")
                                 .and_then(|v| v.as_array())
                                 .is_some_and(|points| {
-                                    points.iter().any(|point| point.get("pinned").is_some())
+                                    points.iter().any(|point| {
+                                        point.get("pinned").and_then(serde_json::Value::as_bool)
+                                            == Some(true)
+                                    })
                                 })
                         })
                     })
@@ -983,8 +988,8 @@ mod tests {
             .open(&path)
             .unwrap();
         assert_eq!(
-            waiting.try_lock_exclusive().unwrap_err().kind(),
-            std::io::ErrorKind::WouldBlock
+            waiting.try_lock_exclusive().unwrap_err().raw_os_error(),
+            fs2::lock_contended_error().raw_os_error()
         );
         drop(first);
         waiting.try_lock_exclusive().unwrap();
@@ -996,8 +1001,8 @@ mod tests {
             .open(&path)
             .unwrap();
         assert_eq!(
-            newcomer.try_lock_exclusive().unwrap_err().kind(),
-            std::io::ErrorKind::WouldBlock
+            newcomer.try_lock_exclusive().unwrap_err().raw_os_error(),
+            fs2::lock_contended_error().raw_os_error()
         );
         FileExt::unlock(&waiting).unwrap();
         newcomer.try_lock_exclusive().unwrap();
@@ -1399,6 +1404,19 @@ mod recovery_tests {
         assert_eq!(fs::read(backups[0].path()).unwrap(), original);
         store.read().unwrap();
         assert_eq!(fs::read_dir(store.parent().unwrap()).unwrap().count(), 4);
+    }
+    #[test]
+    fn repeated_false_only_legacy_reports_do_not_create_backups() {
+        let (_dir, store) = setup();
+        let original = serde_json::to_vec(&store.read().unwrap()).unwrap();
+        for _ in 0..3 {
+            fs::write(&store.path, &original).unwrap();
+            store.read().unwrap();
+        }
+        assert!(!fs::read_dir(store.parent().unwrap())
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| entry.path().extension().is_some_and(|ext| ext == "backup")));
     }
     #[test]
     fn interrupted_pin_writes_recover_and_never_overwrite_newer_legacy_data() {
