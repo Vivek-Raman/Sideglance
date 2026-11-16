@@ -1,6 +1,6 @@
 <script lang="ts">
   import Router from 'svelte-spa-router';
-  import Settings from './settings/Settings.svelte';
+  import Settings from './settings/LazySettings.svelte';
   import Viewer from './viewer/Viewer.svelte';
 
   const routes = {

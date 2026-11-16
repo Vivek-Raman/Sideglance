@@ -1,4 +1,5 @@
 <script lang="ts">
+  import './settings-card.css';
   import { onMount } from 'svelte';
   import { command } from '../shared/commands';
   import { saveAppearance, savePinned } from './appearance';
@@ -337,14 +338,6 @@
   .reset p {
     color: var(--muted);
     margin: 0.4rem 0 0;
-  }
-  .settings-group {
-    display: grid;
-    gap: 1rem;
-    margin: 0 0 24px;
-    padding: 1.1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.65rem;
   }
   .group-heading {
     display: grid;

@@ -20,7 +20,7 @@ tauri = { version = "2.12", features = [] }
 notify = "8"
 chrono = { version = "0.4", features = ["clock"] }
 rmcp = { version = "3.5.1", features = ["transport-io"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std"] }
+tokio = { version = "1", features = ["rt", "io-std", "process", "time", "io-util"] }
 tempfile = "3"
 schemars = "1"
 uuid = { version = "1", features = ["v4", "v5"] }
@@ -42,3 +42,6 @@ default = ["custom-protocol"]
 [profile.dev]
 debug = 0
 incremental = false
+
+[profile.release]
+strip = "symbols"

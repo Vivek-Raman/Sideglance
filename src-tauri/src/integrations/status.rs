@@ -77,6 +77,7 @@ pub(crate) fn additional_codex_agents(home: &Path) -> Vec<AgentInstallation> {
                     .join("SKILL.md")
                     .is_file(),
                 mcp_registered,
+                configuration_valid: false,
                 available: true,
                 config_path: config_path.display().to_string(),
                 error,
@@ -140,7 +141,7 @@ pub(crate) fn integration_status(app: &AppHandle) -> Result<SkillInstallation, S
                     .unwrap_or(false)
             });
     }
-    let agents = AGENTS
+    let mut agents = AGENTS
         .iter()
         .filter(|agent| agent.supports_mcp && harness_available(agent.id, &home))
         .map(|agent| {
@@ -164,13 +165,21 @@ pub(crate) fn integration_status(app: &AppHandle) -> Result<SkillInstallation, S
                     .find(|target| target.id == agent.id)
                     .is_some_and(|target| target.installed),
                 mcp_registered,
+                configuration_valid: false,
                 available: true,
                 config_path: path.display().to_string(),
                 error,
             }
         })
         .collect::<Vec<_>>();
-    let additional_agents = additional_codex_agents(&home);
+    let mut additional_agents = additional_codex_agents(&home);
+    for agent in agents.iter_mut().chain(additional_agents.iter_mut()) {
+        let validation = super::probe::configuration(&home, &agent.id);
+        agent.configuration_valid = validation.is_ok();
+        if agent.mcp_registered && agent.error.is_none() {
+            agent.error = validation.err();
+        }
+    }
     Ok(SkillInstallation {
         installed: destination.join("SKILL.md").is_file(),
         mcp_registered: !agents.is_empty() && agents.iter().all(|agent| agent.mcp_registered),

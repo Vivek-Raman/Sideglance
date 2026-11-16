@@ -1,4 +1,5 @@
 <script lang="ts">
+  import './settings-card.css';
   import type { Settings } from '../shared/types';
   export let settings: Settings;
   export let primaryColors: { name: string; value: string }[] = [];
@@ -63,14 +64,6 @@
 </section>
 
 <style>
-  .settings-group {
-    display: grid;
-    gap: 1rem;
-    margin: 0 0 24px;
-    padding: 1.1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.65rem;
-  }
   .settings-group h2 {
     margin: 0;
     font-size: 1rem;

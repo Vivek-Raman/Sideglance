@@ -194,35 +194,60 @@ fn has_removed_window_preferences(contents: &[u8]) -> bool {
         .is_some_and(|settings| settings.contains_key("window"))
 }
 
+fn load_recoverable(path: &Path) -> Result<(Settings, Option<String>), String> {
+    let contents = match fs::read(path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let defaults = Settings::default();
+            persist(path, &defaults)?;
+            return Ok((defaults, None));
+        }
+        Err(error) => return Err(format!("Unable to read {}: {error}", path.display())),
+    };
+    let parsed = serde_json::from_slice::<Settings>(&contents)
+        .map_err(|error| error.to_string())
+        .and_then(|settings| {
+            validate(&settings)?;
+            Ok(settings)
+        });
+    match parsed {
+        Ok(settings) => {
+            if has_removed_window_preferences(&contents) {
+                persist(path, &settings)?;
+            }
+            Ok((settings, None))
+        }
+        Err(error) => {
+            let backup = path.with_extension(format!("invalid-{}.backup", uuid::Uuid::new_v4()));
+            let parent = path.parent().ok_or("Settings directory unavailable")?;
+            let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+            std::io::Write::write_all(&mut temp, &contents).map_err(|e| e.to_string())?;
+            temp.as_file().sync_all().map_err(|e| e.to_string())?;
+            temp.persist_noclobber(&backup).map_err(|e| e.to_string())?;
+            let defaults = Settings::default();
+            persist(path, &defaults)?;
+            Ok((defaults, Some(format!("Settings could not be loaded: {error}. Defaults are in use. Your original settings are saved at {}", backup.display()))))
+        }
+    }
+}
+
+type SettingsPublisher = Arc<dyn Fn(&Settings) + Send + Sync>;
+
 pub struct SettingsOwner {
     path: PathBuf,
     settings: Mutex<Settings>,
-    publisher: Option<Arc<dyn Fn(&Settings) + Send + Sync>>,
+    publisher: Option<SettingsPublisher>,
+    recovery_warning: Option<String>,
 }
 
 impl SettingsOwner {
     pub fn load(app: &AppHandle) -> Result<Arc<Self>, String> {
         let path = paths::settings_path(app)?;
-        let settings = match fs::read(&path) {
-            Ok(contents) => {
-                let settings: Settings = serde_json::from_slice(&contents)
-                    .map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
-                validate(&settings)?;
-                if has_removed_window_preferences(&contents) {
-                    persist(&path, &settings)?;
-                }
-                settings
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                let settings = Settings::default();
-                persist(&path, &settings)?;
-                settings
-            }
-            Err(error) => return Err(format!("Unable to read {}: {error}", path.display())),
-        };
+        let (settings, recovery_warning) = load_recoverable(&path)?;
         Ok(Arc::new(Self {
             path,
             settings: Mutex::new(settings),
+            recovery_warning,
             publisher: Some(Arc::new({
                 let app = app.clone();
                 move |settings| {
@@ -234,23 +259,11 @@ impl SettingsOwner {
 
     #[cfg(test)]
     pub fn from_path(path: PathBuf) -> Result<Arc<Self>, String> {
-        let settings = match fs::read(&path) {
-            Ok(contents) => {
-                let settings: Settings = serde_json::from_slice(&contents)
-                    .map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
-                validate(&settings)?;
-                settings
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                let settings = Settings::default();
-                persist(&path, &settings)?;
-                settings
-            }
-            Err(error) => return Err(format!("Unable to read {}: {error}", path.display())),
-        };
+        let (settings, recovery_warning) = load_recoverable(&path)?;
         Ok(Arc::new(Self {
             path,
             settings: Mutex::new(settings),
+            recovery_warning,
             publisher: None,
         }))
     }
@@ -258,14 +271,19 @@ impl SettingsOwner {
     #[cfg(test)]
     pub fn from_path_with_publisher(
         path: PathBuf,
-        publisher: Arc<dyn Fn(&Settings) + Send + Sync>,
+        publisher: SettingsPublisher,
     ) -> Result<Arc<Self>, String> {
         let owner = Self::from_path(path)?;
         Ok(Arc::new(Self {
             path: owner.path.clone(),
             settings: Mutex::new(owner.snapshot()),
+            recovery_warning: owner.recovery_warning(),
             publisher: Some(publisher),
         }))
+    }
+
+    pub fn recovery_warning(&self) -> Option<String> {
+        self.recovery_warning.clone()
     }
 
     pub fn snapshot(&self) -> Settings {
@@ -434,6 +452,7 @@ mod tests {
         let owner = SettingsOwner {
             path: directory.path().join("missing/settings.json"),
             settings: Mutex::new(before.clone()),
+            recovery_warning: None,
             publisher: None,
         };
         fs::write(directory.path().join("missing"), "file").unwrap();
@@ -463,5 +482,42 @@ mod tests {
         let events = events.lock().unwrap();
         assert_eq!(events.len(), 2);
         assert_eq!(events.last().unwrap(), &owner.snapshot());
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    #[test]
+    fn invalid_settings_start_with_defaults_and_keep_original_bytes() {
+        for contents in [b"broken".as_slice(), br#"{"textScale":99}"#] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("settings.json");
+            fs::write(&path, contents).unwrap();
+            let owner = SettingsOwner::from_path(path.clone()).unwrap();
+            assert_eq!(owner.snapshot(), Settings::default());
+            assert!(owner
+                .recovery_warning()
+                .unwrap()
+                .contains("original settings"));
+            let backup = fs::read_dir(dir.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .find(|e| e.path().extension().is_some_and(|x| x == "backup"))
+                .unwrap();
+            assert_eq!(fs::read(backup.path()).unwrap(), contents);
+            assert!(SettingsOwner::from_path(path)
+                .unwrap()
+                .recovery_warning()
+                .is_none());
+        }
+    }
+    #[test]
+    fn unreadable_path_is_not_overwritten_as_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::create_dir(&path).unwrap();
+        assert!(SettingsOwner::from_path(path.clone()).is_err());
+        assert!(path.is_dir());
     }
 }

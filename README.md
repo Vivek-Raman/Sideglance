@@ -15,7 +15,7 @@ Pin it above your editor. See what agents are working on, what they've reported 
 - **One board across projects.** Scan agent updates grouped by project and Git branch.
 - **A window that stays visible.** Enable always-on-top while you work in your editor.
 - **Updates from your agents.** Connected agents publish and revise short reports through MCP.
-- **Less clutter.** Dismiss individual updates or enable age-based cleanup.
+- **Less clutter.** Dismiss updates, pin items you want to keep, or enable age/count-based cleanup. Recover automatically removed items from Recently removed.
 - **Your preferred view.** Adjust theme, color, text size, and project order.
 
 Status data stays on your machine. The bundled MCP server receives reports even when the window is closed.
@@ -27,6 +27,8 @@ Status data stays on your machine. The bundled MCP server receives reports even 
 3. Install the bundled skill and configure MCP for your agent. Codex and Claude Code both have setup support for these two steps.
 4. Restart your agent client if needed to load its new configuration, then start a fresh conversation.
 5. Ask your agent: "Use the sideglance skill to report this task in Sideglance."
+
+Use **Test connection** in Agent integration to check a new MCP connection without publishing a report. Existing sessions still need a restart after updating.
 
 Reporting requires a real session ID from the agent client. Configuration alone does not prove reporting works; confirm that your first update appears in the board.
 
@@ -66,14 +68,17 @@ The first macOS installation still needs the [quarantine command above](#install
 
 ## Development
 
-Requires Node 22 or newer, npm, Rust, and the Tauri platform prerequisites.
+Requires Node 24.11.1 or newer, npm, Rust, and the Tauri platform prerequisites. CI uses Rust 1.99.0.
 
 ```sh
-npm install
+npm ci
+npx playwright install chromium
 npm run dev
-npm test
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run format:check
+# Run verification separately from the development server:
+npm run verify
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml --locked
 ```
 
 Build a desktop bundle with `npm run tauri build`. See the [technical reference](docs/technical-reference.md) for the status schema, MCP contract, source layout, and motion checks.

@@ -34,20 +34,22 @@ pub(crate) fn install_menu(app: &tauri::App) -> tauri::Result<()> {
         application.insert(&settings, 1)?;
     }
     app.set_menu(menu)?;
-    app.on_menu_event(|app, event| match event.id().as_ref() {
-        "settings" => show_settings_window(app),
-        _ => {}
+    app.on_menu_event(|app, event| {
+        if event.id().as_ref() == "settings" {
+            if let Err(error) = show_settings_window(app) {
+                eprintln!("Failed to open settings window: {error}");
+            }
+        }
     });
     Ok(())
 }
 
-pub(crate) fn show_settings_window(app: &AppHandle) {
+pub(crate) fn show_settings_window(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        return;
+        window.show()?;
+        return window.set_focus();
     }
-    let result = (|| -> tauri::Result<()> {
+    (|| -> tauri::Result<()> {
         let window = WebviewWindowBuilder::new(
             app,
             "settings",
@@ -65,8 +67,5 @@ pub(crate) fn show_settings_window(app: &AppHandle) {
         restore_native_frame(&window)?;
         window.show()?;
         window.set_focus()
-    })();
-    if let Err(error) = result {
-        eprintln!("Failed to open settings window: {error}");
-    }
+    })()
 }

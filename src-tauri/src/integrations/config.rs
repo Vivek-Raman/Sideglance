@@ -1,5 +1,13 @@
 use serde_json::{json, Map, Value};
-use std::{fs, io::Write, path::Path, process::Command, str::FromStr};
+use std::{
+    fs,
+    io::{Read, Write},
+    path::Path,
+    process::{Command, Output, Stdio},
+    str::FromStr,
+    thread,
+    time::{Duration, Instant},
+};
 use toml_edit::{value, Array, DocumentMut};
 
 use crate::SKILL_NAME;
@@ -31,17 +39,43 @@ pub(crate) fn document_has_codex_mcp(document: &DocumentMut) -> bool {
         })
 }
 
+struct ConfigLock(fs::File);
+impl Drop for ConfigLock {
+    fn drop(&mut self) {
+        let _ = fs2::FileExt::unlock(&self.0);
+    }
+}
+fn lock_config(path: &Path) -> Result<ConfigLock, String> {
+    use fs2::FileExt;
+    let parent = path.parent().ok_or("Configuration directory unavailable")?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let name = path
+        .file_name()
+        .ok_or("Configuration name unavailable")?
+        .to_string_lossy();
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(parent.join(format!(".{name}.sideglance.lock")))
+        .map_err(|error| error.to_string())?;
+    file.try_lock_exclusive().map_err(|_| {
+        "Another Sideglance configuration edit is in progress; retry shortly".to_string()
+    })?;
+    Ok(ConfigLock(file))
+}
+
 pub(crate) fn register_codex_mcp_at(path: &Path, executable: &Path) -> Result<(), String> {
+    let _lock = lock_config(path)?;
     let directory = path
         .parent()
         .ok_or("Codex configuration directory unavailable")?;
     fs::create_dir_all(directory)
         .map_err(|error| format!("Unable to create {}: {error}", directory.display()))?;
-    let contents = match fs::read_to_string(path) {
-        Ok(contents) => contents,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(error) => return Err(format!("Unable to read {}: {error}", path.display())),
-    };
+    let original = read_config_bytes(path)?;
+    let contents = String::from_utf8(original.clone().unwrap_or_default())
+        .map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
     let mut document = DocumentMut::from_str(&contents)
         .map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
     if let Some(servers) = document
@@ -53,11 +87,21 @@ pub(crate) fn register_codex_mcp_at(path: &Path, executable: &Path) -> Result<()
     document["mcp_servers"][SKILL_NAME]["command"] =
         value(executable.to_string_lossy().to_string());
     document["mcp_servers"][SKILL_NAME]["args"] = value(Array::from_iter(["--mcp"]));
-    save_toml_config(path, &document)
+    document["mcp_servers"][SKILL_NAME]["enabled"] = value(true);
+    if let Some(server) = document["mcp_servers"][SKILL_NAME].as_table_like_mut() {
+        server.remove("disabled");
+        server.remove("url");
+        server.remove("bearer_token_env_var");
+    }
+    save_toml_config(path, &document, original.as_deref())
 }
 
-fn save_toml_config(path: &Path, document: &DocumentMut) -> Result<(), String> {
-    save_config(path, document.to_string().as_bytes())
+fn save_toml_config(
+    path: &Path,
+    document: &DocumentMut,
+    original: Option<&[u8]>,
+) -> Result<(), String> {
+    save_config(path, document.to_string().as_bytes(), original)
 }
 
 pub(crate) fn register_codex_mcp(path: &Path, executable: &Path) -> Result<(), String> {
@@ -65,12 +109,14 @@ pub(crate) fn register_codex_mcp(path: &Path, executable: &Path) -> Result<(), S
 }
 
 pub(crate) fn unregister_codex_mcp_at(path: &Path) -> Result<(), String> {
-    let contents = match fs::read_to_string(path) {
-        Ok(contents) => contents,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(format!("Unable to read {}: {error}", path.display())),
+    let _lock = lock_config(path)?;
+    let original = read_config_bytes(path)?;
+    let Some(bytes) = original.as_ref() else {
+        return Ok(());
     };
-    let mut document = DocumentMut::from_str(&contents)
+    let contents = std::str::from_utf8(bytes)
+        .map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
+    let mut document = DocumentMut::from_str(contents)
         .map_err(|error| format!("Unable to read {}: {error}", path.display()))?;
     let removed = document
         .as_table_mut()
@@ -84,7 +130,7 @@ pub(crate) fn unregister_codex_mcp_at(path: &Path) -> Result<(), String> {
                     .is_some_and(|servers| servers.remove(SKILL_NAME).is_some())
         });
     if removed {
-        save_toml_config(path, &document)?;
+        save_toml_config(path, &document, original.as_deref())?;
     }
     Ok(())
 }
@@ -132,13 +178,41 @@ fn existing_nested_object_mut<'a>(
     }
 }
 
-fn save_json_config(path: &Path, value: &Value) -> Result<(), String> {
+fn save_json_config(path: &Path, value: &Value, original: Option<&[u8]>) -> Result<(), String> {
     let contents = serde_json::to_vec_pretty(value)
         .map_err(|error| format!("Unable to encode {}: {error}", path.display()))?;
-    save_config(path, &contents)
+    save_config(path, &contents, original)
 }
 
-fn save_config(path: &Path, contents: &[u8]) -> Result<(), String> {
+fn read_config_bytes(path: &Path) -> Result<Option<Vec<u8>>, String> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            return Err(format!(
+                "{} must be a regular configuration file",
+                path.display()
+            ));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("Unable to inspect {}: {error}", path.display())),
+    }
+    fs::read(path)
+        .map(Some)
+        .map_err(|error| format!("Unable to read {}: {error}", path.display()))
+}
+
+fn read_json_snapshot(path: &Path) -> Result<(Value, Option<Vec<u8>>), String> {
+    let original = read_config_bytes(path)?;
+    let value = match original.as_deref() {
+        None => json!({}),
+        Some(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => json!({}),
+        Some(bytes) => serde_json::from_slice(bytes)
+            .map_err(|error| format!("Unable to read {}: {error}", path.display()))?,
+    };
+    Ok((value, original))
+}
+
+fn save_config(path: &Path, contents: &[u8], original: Option<&[u8]>) -> Result<(), String> {
     let directory = path.parent().ok_or("Configuration directory unavailable")?;
     fs::create_dir_all(directory)
         .map_err(|error| format!("Unable to create {}: {error}", directory.display()))?;
@@ -168,6 +242,14 @@ fn save_config(path: &Path, contents: &[u8]) -> Result<(), String> {
         .as_file()
         .sync_all()
         .map_err(|error| format!("Unable to sync {}: {error}", path.display()))?;
+    // Detect edits since the transaction began. External applications do not
+    // share our lock, so a small check-to-rename race remains unavoidable.
+    if read_config_bytes(path)?.as_deref() != original {
+        return Err(format!(
+            "{} changed while Sideglance was editing it. Retry the operation.",
+            path.display()
+        ));
+    }
     temporary
         .persist(path)
         .map_err(|error| format!("Unable to save {}: {error}", path.display()))?;
@@ -175,18 +257,20 @@ fn save_config(path: &Path, contents: &[u8]) -> Result<(), String> {
 }
 
 pub(crate) fn register_standard_json_mcp(path: &Path, executable: &Path) -> Result<(), String> {
-    let mut config = read_json_config(path)?;
+    let _lock = lock_config(path)?;
+    let (mut config, original) = read_json_snapshot(path)?;
     let servers = nested_object_mut(&mut config, &["mcpServers"], &path.display().to_string())?;
     servers.remove("ctx-ppteer");
     servers.insert(
         SKILL_NAME.into(),
         json!({ "command": executable, "args": ["--mcp"] }),
     );
-    save_json_config(path, &config)
+    save_json_config(path, &config, original.as_deref())
 }
 
 pub(crate) fn register_opencode_mcp(path: &Path, executable: &Path) -> Result<(), String> {
-    let mut config = read_json_config(path)?;
+    let _lock = lock_config(path)?;
+    let (mut config, original) = read_json_snapshot(path)?;
     let servers = nested_object_mut(
         &mut config,
         &["mcp", "servers"],
@@ -197,15 +281,16 @@ pub(crate) fn register_opencode_mcp(path: &Path, executable: &Path) -> Result<()
         SKILL_NAME.into(),
         json!({ "type": "local", "command": [executable, "--mcp"], "codemode": false }),
     );
-    save_json_config(path, &config)
+    save_json_config(path, &config, original.as_deref())
 }
 
 pub(crate) fn unregister_json_mcp(path: &Path, keys: &[&str]) -> Result<(), String> {
-    let mut config = read_json_config(path)?;
+    let _lock = lock_config(path)?;
+    let (mut config, original) = read_json_snapshot(path)?;
     let removed = existing_nested_object_mut(&mut config, keys)
         .is_some_and(|servers| servers.remove(SKILL_NAME).is_some());
     if removed {
-        save_json_config(path, &config)?;
+        save_json_config(path, &config, original.as_deref())?;
     }
     Ok(())
 }
@@ -232,23 +317,66 @@ pub(crate) fn command_exists(command: &str) -> bool {
     })
 }
 
+// Temporary output files avoid pipe deadlocks when a CLI emits more than a
+// pipe buffer. Only a bounded stderr excerpt reaches the user.
+fn run_bounded(command: &mut Command, timeout: Duration) -> std::io::Result<Output> {
+    let mut stdout = tempfile::tempfile()?;
+    let mut stderr = tempfile::tempfile()?;
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(stdout.try_clone()?)
+        .stderr(stderr.try_clone()?)
+        .spawn()?;
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
+            result => {
+                let error = result.err().unwrap_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "Claude Code timed out; retry after checking its installation",
+                    )
+                });
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        }
+    };
+    use std::io::{Seek, SeekFrom};
+    stdout.seek(SeekFrom::Start(0))?;
+    stderr.seek(SeekFrom::Start(0))?;
+    let mut output = Output {
+        status,
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+    };
+    stdout.take(64 * 1024).read_to_end(&mut output.stdout)?;
+    stderr.take(64 * 1024).read_to_end(&mut output.stderr)?;
+    Ok(output)
+}
+
 pub(crate) fn install_claude_mcp(executable: &Path, config_path: &Path) -> Result<bool, String> {
-    let output = match Command::new("claude")
-        .args(["mcp", "add", SKILL_NAME, "--scope", "user", "--"])
-        .arg(executable)
-        .arg("--mcp")
-        .output()
-    {
+    let output = match run_bounded(
+        Command::new("claude")
+            .args(["mcp", "add", SKILL_NAME, "--scope", "user", "--"])
+            .arg(executable)
+            .arg("--mcp"),
+        Duration::from_secs(30),
+    ) {
         Ok(output) => output,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(error) => return Err(format!("Unable to run Claude Code: {error}")),
     };
     if output.status.success() {
-        let mut config = read_json_config(config_path)?;
+        let _lock = lock_config(config_path)?;
+        let (mut config, original) = read_json_snapshot(config_path)?;
         if existing_nested_object_mut(&mut config, &["mcpServers"])
             .is_some_and(|servers| servers.remove("ctx-ppteer").is_some())
         {
-            save_json_config(config_path, &config)?;
+            save_json_config(config_path, &config, original.as_deref())?;
         }
         Ok(true)
     } else {
@@ -260,10 +388,10 @@ pub(crate) fn install_claude_mcp(executable: &Path, config_path: &Path) -> Resul
 }
 
 pub(crate) fn uninstall_claude_mcp() -> Result<bool, String> {
-    let output = match Command::new("claude")
-        .args(["mcp", "remove", SKILL_NAME, "--scope", "user"])
-        .output()
-    {
+    let output = match run_bounded(
+        Command::new("claude").args(["mcp", "remove", SKILL_NAME, "--scope", "user"]),
+        Duration::from_secs(30),
+    ) {
         Ok(output) => output,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(error) => return Err(format!("Unable to run Claude Code: {error}")),
@@ -303,7 +431,7 @@ mod tests {
             let servers = nested_object_mut(&mut config, &keys, "test").unwrap();
             servers.insert("ctx-ppteer".into(), json!({"command":"old"}));
             servers.insert("other".into(), json!({"command":"other"}));
-            save_json_config(&path, &config).unwrap();
+            save_json_config(&path, &config, read_config_bytes(&path).unwrap().as_deref()).unwrap();
             if keys.len() == 1 {
                 register_standard_json_mcp(&path, Path::new("sideglance")).unwrap();
             } else {
@@ -316,6 +444,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn mcp_changes_preserve_existing_config_permissions() {
         use std::os::unix::fs::PermissionsExt;
@@ -519,5 +648,85 @@ mod tests {
         let config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         assert!(config["mcp"]["servers"]["existing"].is_object());
         assert_eq!(config["mcp"]["servers"][SKILL_NAME]["type"], "local");
+    }
+    #[test]
+    fn detects_external_config_edit_before_replacement() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mcp.json");
+        fs::write(&path, r#"{"before":true}"#).unwrap();
+        let original = read_config_bytes(&path).unwrap();
+        let newer = br#"{"external":"keep me"}"#;
+        fs::write(&path, newer).unwrap();
+        assert!(save_config(&path, b"{}", original.as_deref())
+            .unwrap_err()
+            .contains("changed"));
+        assert_eq!(fs::read(&path).unwrap(), newer);
+        fs::remove_file(&path).unwrap();
+        assert!(save_config(&path, b"{}", original.as_deref()).is_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn cooperating_config_edits_do_not_overlap() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let lock = lock_config(&path).unwrap();
+        assert!(register_codex_mcp_at(&path, Path::new("sideglance")).is_err());
+        drop(lock);
+        register_codex_mcp_at(&path, Path::new("sideglance")).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bounded_process_captures_large_output_and_reaps_timeout() {
+        let output = run_bounded(
+            Command::new("sh").args(["-c", "head -c 100000 /dev/zero >&2"]),
+            Duration::from_secs(3),
+        )
+        .unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stderr.len(), 64 * 1024);
+        let dir = tempfile::tempdir().unwrap();
+        let pid_path = dir.path().join("pid");
+        let start = Instant::now();
+        let error = run_bounded(
+            Command::new("sh")
+                .args(["-c", "echo $$ > \"$1\"; exec sleep 30", "sh"])
+                .arg(&pid_path),
+            Duration::from_millis(100),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        assert!(start.elapsed() < Duration::from_secs(3));
+        let pid = fs::read_to_string(pid_path).unwrap();
+        assert!(!Command::new("kill")
+            .args(["-0", pid.trim()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap()
+            .success());
+    }
+}
+
+#[cfg(test)]
+mod repair_tests {
+    use super::*;
+    #[test]
+    fn repair_enables_local_codex_and_removes_conflicting_remote_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path,"[mcp_servers.sideglance]\nenabled=false\ndisabled=true\nurl='https://example.com/mcp'\n").unwrap();
+        register_codex_mcp_at(&path, Path::new("sideglance")).unwrap();
+        let doc = fs::read_to_string(&path)
+            .unwrap()
+            .parse::<DocumentMut>()
+            .unwrap();
+        assert_eq!(
+            doc["mcp_servers"][SKILL_NAME]["enabled"].as_bool(),
+            Some(true)
+        );
+        assert!(doc["mcp_servers"][SKILL_NAME].get("url").is_none());
+        assert!(doc["mcp_servers"][SKILL_NAME].get("disabled").is_none());
     }
 }

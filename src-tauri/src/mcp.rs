@@ -79,9 +79,9 @@ fn map_status_error(error: StatusError) -> McpError {
     match error {
         StatusError::InvalidInput(message) => McpError::invalid_params(message, None),
         StatusError::Conflict(message) => McpError::invalid_params(message, None),
-        StatusError::InvalidDocument(message) | StatusError::Io(message) => {
-            McpError::internal_error(message, None)
-        }
+        StatusError::InvalidDocument(message)
+        | StatusError::Io(message)
+        | StatusError::LockTimeout(message) => McpError::internal_error(message, None),
     }
 }
 
@@ -102,18 +102,22 @@ impl StatusServer {
         &self,
         Parameters(input): Parameters<ReadStatusInput>,
     ) -> Result<String, McpError> {
-        let path = paths::status_path()
-            .map_err(|error| McpError::internal_error(error.to_string(), None))?;
-        let entries = StatusStore::new(path)
-            .read_project(&input.folder_name, &input.session_id)
-            .map_err(map_status_error)?;
-        let points: Vec<AgentPoint> = entries
-            .into_iter()
-            .flat_map(|entry| entry.points)
-            .map(Into::into)
-            .collect();
-        serde_json::to_string(&points)
-            .map_err(|error| McpError::internal_error(error.to_string(), None))
+        tokio::task::spawn_blocking(move || {
+            let path = paths::status_path()
+                .map_err(|error| McpError::internal_error(error.to_string(), None))?;
+            let entries = StatusStore::new(path)
+                .read_project(&input.folder_name, &input.session_id)
+                .map_err(map_status_error)?;
+            let points: Vec<AgentPoint> = entries
+                .into_iter()
+                .flat_map(|entry| entry.points)
+                .map(Into::into)
+                .collect();
+            serde_json::to_string(&points)
+                .map_err(|error| McpError::internal_error(error.to_string(), None))
+        })
+        .await
+        .map_err(|error| McpError::internal_error(format!("Status worker failed: {error}"), None))?
     }
 
     #[tool(
@@ -123,19 +127,24 @@ impl StatusServer {
         &self,
         Parameters(input): Parameters<WriteStatusInput>,
     ) -> Result<String, McpError> {
-        let path = paths::status_path().map_err(|error| McpError::internal_error(error, None))?;
-        let (_, points) = StatusStore::new(path)
-            .upsert_with_repository_result(
-                input.folder_name.clone(),
-                input.session_id,
-                input.branch,
-                input.points.into_iter().map(Into::into).collect(),
-                input.repository,
-            )
-            .map_err(|error| map_status_error(error))?;
-        let points: Vec<AgentPoint> = points.into_iter().map(Into::into).collect();
-        serde_json::to_string(&points)
-            .map_err(|error| McpError::internal_error(error.to_string(), None))
+        tokio::task::spawn_blocking(move || {
+            let path =
+                paths::status_path().map_err(|error| McpError::internal_error(error, None))?;
+            let (_, points) = StatusStore::new(path)
+                .upsert_with_repository_result(
+                    input.folder_name.clone(),
+                    input.session_id,
+                    input.branch,
+                    input.points.into_iter().map(Into::into).collect(),
+                    input.repository,
+                )
+                .map_err(map_status_error)?;
+            let points: Vec<AgentPoint> = points.into_iter().map(Into::into).collect();
+            serde_json::to_string(&points)
+                .map_err(|error| McpError::internal_error(error.to_string(), None))
+        })
+        .await
+        .map_err(|error| McpError::internal_error(format!("Status worker failed: {error}"), None))?
     }
 }
 
@@ -143,7 +152,9 @@ impl StatusServer {
 impl ServerHandler for StatusServer {}
 
 pub fn run() -> Result<(), String> {
-    tokio::runtime::Runtime::new()
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
         .map_err(|error| error.to_string())?
         .block_on(async {
             StatusServer::new()
