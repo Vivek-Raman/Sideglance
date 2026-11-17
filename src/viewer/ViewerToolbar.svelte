@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Moon from '@lucide/svelte/icons/moon';
+  import Sun from '@lucide/svelte/icons/sun';
+  import Monitor from '@lucide/svelte/icons/monitor';
+  import AArrowDown from '@lucide/svelte/icons/a-arrow-down';
+  import AArrowUp from '@lucide/svelte/icons/a-arrow-up';
   import ToolbarUpdateButton from './ToolbarUpdateButton.svelte';
   import type { Settings } from '../shared/types';
   export let settings: Settings | null;
@@ -29,21 +34,27 @@
     aria-label={`Theme: ${settings?.theme ?? 'system'}. Click to change`}
     title={`Theme: ${settings?.theme ?? 'system'}`}
   >
-    {settings?.theme === 'dark' ? '☾' : settings?.theme === 'light' ? '☀' : '◐'}
+    {#if settings?.theme === 'dark'}
+      <Moon size={14} aria-hidden="true" />
+    {:else if settings?.theme === 'light'}
+      <Sun size={14} aria-hidden="true" />
+    {:else}
+      <Monitor size={14} aria-hidden="true" />
+    {/if}
   </button>
   <button
     class="icon-button"
     onclick={() => void onTextScale(-1)}
     disabled={!settings || settings.textScale <= textScales[0]}
     aria-label="Decrease text size"
-    title="Decrease text size">A−</button
+    title="Decrease text size"><AArrowDown size={14} aria-hidden="true" /></button
   >
   <button
     class="icon-button"
     onclick={() => void onTextScale(1)}
     disabled={!settings || settings.textScale >= textScales[textScales.length - 1]}
     aria-label="Increase text size"
-    title="Increase text size">A+</button
+    title="Increase text size"><AArrowUp size={14} aria-hidden="true" /></button
   >
   <button onclick={() => void onSettings()}>Settings</button>
 </div>
@@ -103,6 +114,9 @@
     outline-offset: 2px;
   }
   .icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-width: 1.8rem;
     padding-inline: 0.35rem !important;
   }

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Pin from '@lucide/svelte/icons/pin';
+  import X from '@lucide/svelte/icons/x';
   import type { StatusEntry, StatusPoint } from '../shared/types';
   import { relativeTime } from './rows';
   export let sessionLabel: string | null = null;
@@ -52,15 +54,7 @@
         aria-pressed={!!point.pinned}
         title={point.pinned ? 'Unpin point' : 'Pin point'}
       >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill={point.pinned ? 'currentColor' : 'none'}
-          stroke="currentColor"
-          stroke-width="2"
-          aria-hidden="true"><path d="m16 3 5 5-4 1-4 4v4l-3-3-7 7 7-7-3-3h4l4-4z" /></svg
-        >
+        <Pin size={12} fill={point.pinned ? 'currentColor' : 'none'} aria-hidden="true" />
       </button>
       <span class="point-age">{relativeTime(point.submitted_at ?? entry.updated_at, now)}</span>
       <button
@@ -68,7 +62,7 @@
         onclick={() => void onDismiss()}
         disabled={!!point.pinned || dismissing || removing}
         aria-label={`Dismiss ${point.text}`}
-        title="Dismiss point">×</button
+        title="Dismiss point"><X size={12} aria-hidden="true" /></button
       >
     </span>
   </li>
@@ -170,6 +164,9 @@
     outline: 2px solid var(--accent);
   }
   .dismiss-point {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 0 0.28rem;
     border: 0;
     border-radius: 0.3rem;

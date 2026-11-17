@@ -1,4 +1,8 @@
 <script lang="ts">
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Download from '@lucide/svelte/icons/download';
+  import Package from '@lucide/svelte/icons/package';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import { check, type Update } from '@tauri-apps/plugin-updater';
   import { onMount } from 'svelte';
   import { command } from '../shared/commands';
@@ -183,28 +187,17 @@
   {title}
   onclick={activate}
 >
-  <svg
-    viewBox="0 0 24 24"
-    width="15"
-    height="15"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="1.7"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    aria-hidden="true"
-    class:spinning={busy}
-  >
+  <span class="update-icon" class:spinning={busy}>
     {#if busy || stage === 'check'}
-      <path d="M20 7a9 9 0 0 0-15-2L3 7m0-5v5h5M4 17a9 9 0 0 0 15 2l2-2m0 5v-5h-5" />
+      <RefreshCw size={15} stroke-width={1.7} aria-hidden="true" />
     {:else if stage === 'download'}
-      <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" />
+      <Download size={15} stroke-width={1.7} aria-hidden="true" />
     {:else if stage === 'install'}
-      <path d="m12 3 9 5v9l-9 5-9-5V8l9-5Zm-9 5 9 5 9-5M12 13v9M7.5 5.5l9 5" />
+      <Package size={15} stroke-width={1.7} aria-hidden="true" />
     {:else}
-      <path d="M4 10a8 8 0 1 1 1 7M4 4v6h6" />
+      <RotateCcw size={15} stroke-width={1.7} aria-hidden="true" />
     {/if}
-  </svg>
+  </span>
 </button>
 <span class="announcement" role="status"
   >{message ||
@@ -241,6 +234,9 @@
   button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+  .update-icon {
+    display: inline-flex;
   }
   .spinning {
     animation: spin 1s linear infinite;

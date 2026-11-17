@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import {
     collapsedRowKeys,
     countExpiryKeys,
@@ -370,17 +371,7 @@
                 title={collapsed.has(row.key) ? 'Expand group' : 'Collapse group'}
                 onclick={() => toggleCollapsed(row.key)}
               >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  aria-hidden="true"
-                >
-                  <path d="m6 3 5 5-5 5" />
-                </svg>
+                <ChevronRight size={12} stroke-width={1.5} aria-hidden="true" />
               </button>
             </div>
           {:else}
@@ -479,11 +470,11 @@
       opacity 120ms ease,
       background 120ms ease;
   }
-  .collapse-toggle svg {
+  .collapse-toggle :global(svg) {
     transform: rotate(90deg);
     transition: transform 220ms var(--ease-gentle-out);
   }
-  .collapse-toggle.is-collapsed svg {
+  .collapse-toggle.is-collapsed :global(svg) {
     transform: rotate(0);
   }
   .group-heading.is-hovered .collapse-toggle,
@@ -508,7 +499,7 @@
   @media (prefers-reduced-motion: reduce) {
     .motion-row,
     .collapse-toggle,
-    .collapse-toggle svg {
+    .collapse-toggle :global(svg) {
       transition: none;
     }
   }
