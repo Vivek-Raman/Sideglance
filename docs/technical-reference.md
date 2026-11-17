@@ -63,3 +63,14 @@ The headless MCP uses a current-thread runtime and blocking workers for storage.
 Release builds strip symbols. A local macOS executable experiment reduced 18.85 MB to 13.43 MB and passed the temporary-home MCP workload. These are executable sizes, not installer or whole-app measurements. Local target caches and tracked generated schemas are separate from distributed bundle size. LTO and codegen-unit changes have not been adopted without further measurements.
 
 PR checks cover frontend unit/browser/type/format checks, a high-severity npm audit gate, and Rust format/Clippy/tests across macOS, Linux, and Windows. The current npm audit retains two low findings through the latest Svelte build plugin's deepmerge dependency, which handles trusted local compiler configuration. There is no upstream fix reported by npm; recheck the exception on updates. RustSec tooling was unavailable during local remediation. Platform CI and native visibility/minimize/event-delivery behavior require their own verification; Chromium fixtures establish frontend behavior, not native WebKit behavior.
+
+## Build dependency audit exception
+
+CI runs `npm run audit`, which blocks high and critical npm audit findings except
+GHSA-fc5q-39xc-vjpf when every affected dependency is marked development-only in
+the lockfile. This exception was approved on 2026-11-17 because picomatch has no
+patched release. Vite, tinyglobby and svelte-check use it for filename matching
+during development and verification; it is not shipped in the app runtime. The
+vulnerability remains present in build tooling. Avoid untrusted glob patterns.
+Remove the exception when an upstream fix becomes available. Other advisories,
+production dependencies, and audit execution errors still fail the check.
