@@ -20,6 +20,6 @@ pub fn clear_expired_points(state: &ViewerState, owner: &SettingsOwner) -> Resul
     }
     state
         .store
-        .apply_retention(&rules)
+        .apply_retention_with_history(&rules, settings.recently_removed_enabled)
         .map_err(|error| error.to_string())
 }

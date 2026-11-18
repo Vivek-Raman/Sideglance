@@ -4,6 +4,7 @@
   export let autoClearAfterMinutes: number | null;
   export let maxStatusItemsPerProject: number | null;
   export let disabled = false;
+  export let recentlyRemovedEnabled = false;
   export let onApply: () => Promise<void>;
   let count: number | null = null;
   let busy = false;
@@ -46,7 +47,7 @@
     <p role="status">
       About {count}
       {count === 1 ? 'item would' : 'items would'} be removed now. Incoming updates may change this count.
-      Removed items can be recovered from Recently removed.
+      {#if recentlyRemovedEnabled}Removed items can be recovered from Recently removed.{/if}
     </p>
     <button disabled={disabled || busy} onclick={() => void onApply()}>Apply deletion rule</button>
   {/if}

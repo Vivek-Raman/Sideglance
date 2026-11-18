@@ -77,6 +77,7 @@ export type Settings = {
   projectSortOrder: ProjectSortOrder;
   statusSortOrder: StatusSortOrder;
   autoClearAfterMinutes: number | null;
+  recentlyRemovedEnabled: boolean;
   maxStatusItemsPerProject: number | null;
   undoLimit: number;
 };

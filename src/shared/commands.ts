@@ -7,6 +7,7 @@ type CommandMap = {
     result: { status: 'connected' | 'invalid' | 'error'; message: string };
   };
   get_snapshot: { args: undefined; result: Snapshot };
+  set_recently_removed_enabled: { args: { enabled: boolean }; result: void };
   get_recently_removed: { args: undefined; result: RemovedPoint[] };
   restore_removed: { args: { id: string }; result: void };
   preview_retention: {

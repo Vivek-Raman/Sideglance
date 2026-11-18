@@ -2,6 +2,11 @@
   import { command } from '../shared/commands';
   import type { RemovedPoint } from '../shared/types';
   export let onRestored: () => Promise<void>;
+  export let revision = 0;
+  $: {
+    revision;
+    void load();
+  }
   let opened = false;
   let busy = false;
   let error = '';
@@ -10,7 +15,7 @@
   async function load() {
     busy = true;
     error = '';
-    shown = 50;
+    if (!opened) shown = 50;
     try {
       items = await command('get_recently_removed');
     } catch (failure) {
@@ -34,41 +39,43 @@
   }
 </script>
 
-<details
-  ontoggle={(event) => {
-    opened = event.currentTarget.open;
-    if (opened) void load();
-  }}
->
-  <summary>Recently removed</summary>
-  {#if opened}
-    <p>Automatically removed items are kept for up to 30 days within the local history limit.</p>
-    {#if busy}<p role="status">Loading…</p>{/if}
-    {#if error}<p role="alert">{error}</p>
-      <button disabled={busy} onclick={() => void load()}>Try again</button>{/if}
-    {#if !busy && !error && !items.length}<p>No recently removed items.</p>{/if}
-    <ul>
-      {#each items.slice(0, shown) as item (item.id)}
-        <li>
-          <span>{item.entry.points[0]?.text ?? 'Removed item'}</span>
-          <small
-            >{item.entry.folder_name} · {item.reason} ·
-            <time datetime={item.removed_at}>{new Date(item.removed_at).toLocaleString()}</time
-            ></small
-          >
-          <button
-            disabled={busy}
-            onclick={() => void restore(item.id)}
-            aria-label={`Restore and pin ${item.entry.points[0]?.text ?? 'item'}`}
-            >Restore and pin</button
-          >
-        </li>
-      {/each}
-    </ul>
-    {#if items.length > shown}<button onclick={() => (shown += 50)}>Show more removed items</button
-      >{/if}
-  {/if}
-</details>
+{#if items.length || error}
+  <details
+    ontoggle={(event) => {
+      opened = event.currentTarget.open;
+      if (opened) void load();
+    }}
+  >
+    <summary>Recently removed</summary>
+    {#if opened}
+      <p>Automatically removed items are kept for up to 30 days within the local history limit.</p>
+      {#if busy}<p role="status">Loading…</p>{/if}
+      {#if error}<p role="alert">{error}</p>
+        <button disabled={busy} onclick={() => void load()}>Try again</button>{/if}
+      <ul>
+        {#each items.slice(0, shown) as item (item.id)}
+          <li>
+            <span>{item.entry.points[0]?.text ?? 'Removed item'}</span>
+            <small
+              >{item.entry.folder_name} · {item.reason} ·
+              <time datetime={item.removed_at}>{new Date(item.removed_at).toLocaleString()}</time
+              ></small
+            >
+            <button
+              disabled={busy}
+              onclick={() => void restore(item.id)}
+              aria-label={`Restore and pin ${item.entry.points[0]?.text ?? 'item'}`}
+              >Restore and pin</button
+            >
+          </li>
+        {/each}
+      </ul>
+      {#if items.length > shown}<button onclick={() => (shown += 50)}
+          >Show more removed items</button
+        >{/if}
+    {/if}
+  </details>
+{/if}
 
 <style>
   details {

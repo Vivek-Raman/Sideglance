@@ -3,7 +3,6 @@
   import X from '@lucide/svelte/icons/x';
   import type { StatusEntry, StatusPoint } from '../shared/types';
   import { relativeTime } from './rows';
-  export let sessionLabel: string | null = null;
   export let entry: StatusEntry;
   export let point: StatusPoint;
   export let last: boolean;
@@ -33,9 +32,6 @@
 
 <ul class:branch-end={last}>
   <li class="status-point" class:removing class:expiring-soon={expiring}>
-    {#if sessionLabel}<span class="session-label" title={entry.session_id ?? 'Legacy session'}
-        >{sessionLabel}<span class="sr-only">: {entry.session_id}</span></span
-      >{/if}
     <span class="point-text"
       >{#if point.done}<strong>DONE</strong>: {' '}{/if}{point.text}{#if link}{' '}<a
           href={link}
@@ -69,18 +65,6 @@
 </ul>
 
 <style>
-  .session-label {
-    color: var(--muted);
-    font-size: 0.75em;
-    margin-right: 0.4rem;
-  }
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
   button {
     flex: none;
     border: 1px solid transparent;

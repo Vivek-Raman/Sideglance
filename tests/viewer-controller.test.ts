@@ -18,6 +18,7 @@ const settings: Settings = {
   projectSortOrder: 'project-directory-asc',
   statusSortOrder: 'submitted-at-desc',
   autoClearAfterMinutes: null,
+  recentlyRemovedEnabled: false,
   maxStatusItemsPerProject: null,
   undoLimit: 3,
 };

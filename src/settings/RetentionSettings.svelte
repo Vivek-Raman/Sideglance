@@ -58,6 +58,17 @@
       if (current === request) savingRequest = false;
     }
   }
+  async function saveHistory(enabled: boolean) {
+    savingRequest = true;
+    try {
+      await command('set_recently_removed_enabled', { enabled });
+      settings.recentlyRemovedEnabled = enabled;
+    } catch (error) {
+      onError(error);
+    } finally {
+      savingRequest = false;
+    }
+  }
   function toggle(enabled: boolean) {
     draft = editRetentionDraft(draft, { enabled });
     updateDraft();
@@ -128,6 +139,7 @@
       </div>
       {#if draft.confirmation}
         <RetentionPreview
+          recentlyRemovedEnabled={settings.recentlyRemovedEnabled}
           autoClearAfterMinutes={draftMinutes(draft)}
           maxStatusItemsPerProject={settings.maxStatusItemsPerProject}
           disabled={saving || savingRequest}
@@ -135,6 +147,16 @@
         />
       {/if}{/if}
     <CountRetentionSettings {settings} {saving} {resetVersion} {onError} />
+    <label class="checkbox">
+      <input
+        type="checkbox"
+        checked={settings.recentlyRemovedEnabled}
+        disabled={saving || savingRequest}
+        onchange={(event) => void saveHistory(event.currentTarget.checked)}
+      />
+      Keep recently removed history
+    </label>
+    <p>Keep automatically removed items for recovery for up to 30 days. Hidden when empty.</p>
   </div>
 </section>
 

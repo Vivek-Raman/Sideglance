@@ -19,6 +19,7 @@ pub fn run() {
             desktop::commands::get_snapshot,
             desktop::commands::test_mcp_connection,
             desktop::commands::get_recently_removed,
+            desktop::commands::set_recently_removed_enabled,
             desktop::commands::restore_removed,
             desktop::commands::preview_retention,
             desktop::commands::dismiss_point,

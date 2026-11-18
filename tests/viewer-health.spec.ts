@@ -15,7 +15,7 @@ test('empty, healthy, stale and paused updates remain understandable', async ({ 
   await expect(page.getByRole('button', { name: 'Set up agent integration' })).toBeVisible();
   await page.evaluate(() => window.fixture.set('current', window.fixture.entries()));
   await expect(page.getByText('Point 1', { exact: true })).toBeVisible();
-  await expect(page.locator('.session-label').filter({ hasText: 'Session 1' })).toBeVisible();
+  await expect(page.getByText(/^Session \d+$/)).toHaveCount(0);
   await page.evaluate(() => {
     const node = document.querySelector('.point-text');
     const range = document.createRange();
@@ -45,6 +45,7 @@ test('collapsed groups survive reload and archive restoration is explicit', asyn
   await expect(page.getByRole('button', { name: 'Set up agent integration' })).toBeVisible();
   await page.evaluate(() => {
     window.fixture.set('current', window.fixture.entries());
+    window.fixture.historyEnabled(true);
     window.fixture.removed();
   });
   const expand = page.getByRole('button', { name: 'Expand project', exact: true });
@@ -55,7 +56,7 @@ test('collapsed groups survive reload and archive restoration is explicit', asyn
   await expect(page.getByRole('button', { name: 'Collapse project', exact: true })).toBeVisible();
   await page.getByText('Recently removed', { exact: true }).click();
   await page.getByRole('button', { name: 'Restore and pin Point 1' }).click();
-  await expect(page.getByText('No recently removed items.')).toBeVisible();
+  await expect(page.getByText('Recently removed', { exact: true })).toHaveCount(0);
 });
 test('enabling deletion requires a preview and explicit apply', async ({ page }) => {
   await page.goto('/tests/health.html?mode=retention');
@@ -82,4 +83,19 @@ test('configured integrations offer read-only connection testing and repair', as
   await page.getByRole('button', { name: 'Test connection' }).click();
   await expect(page.getByRole('status')).toContainText('Connected:');
   await expect(page.getByRole('button', { name: 'Repair MCP' })).toBeVisible();
+});
+
+test('recently removed is opt-in and hidden when empty', async ({ page }) => {
+  await page.goto('/tests/health.html');
+  await expect(page.getByRole('button', { name: 'Set up agent integration' })).toBeVisible();
+  await page.evaluate(() => window.fixture.removed());
+  await expect(page.getByText('Recently removed', { exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.fixture.historyEnabled(true));
+  await expect(page.getByText('Recently removed', { exact: true })).toBeVisible();
+  await page.evaluate(() => window.fixture.historyEnabled(false));
+  await expect(page.getByText('Recently removed', { exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Set up agent integration' })).toBeVisible();
+  await page.evaluate(() => window.fixture.historyEnabled(true));
+  await expect(page.getByText('Recently removed', { exact: true })).toHaveCount(0);
 });

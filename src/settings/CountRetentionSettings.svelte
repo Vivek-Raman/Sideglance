@@ -71,6 +71,7 @@
     </label>
     {#if confirmation}
       <RetentionPreview
+        recentlyRemovedEnabled={settings.recentlyRemovedEnabled}
         autoClearAfterMinutes={settings.autoClearAfterMinutes}
         maxStatusItemsPerProject={count}
         disabled={saving || pending}

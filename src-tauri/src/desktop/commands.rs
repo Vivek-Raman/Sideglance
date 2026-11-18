@@ -234,6 +234,22 @@ pub(crate) async fn set_status_sort_order(
 }
 
 #[tauri::command]
+pub(crate) async fn set_recently_removed_enabled(
+    enabled: bool,
+    owner: State<'_, Arc<SettingsOwner>>,
+) -> Result<(), String> {
+    let owner = owner.inner().clone();
+    blocking(move || {
+        owner.update(|settings| {
+            settings.recently_removed_enabled = enabled;
+            Ok(())
+        })?;
+        Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
 pub(crate) async fn set_auto_clear_after_minutes(
     auto_clear_after_minutes: Option<u64>,
     app: AppHandle,

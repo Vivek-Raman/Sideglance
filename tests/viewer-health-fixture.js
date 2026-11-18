@@ -15,6 +15,7 @@ const settings = {
   statusSortOrder: 'submitted-at-desc',
   statusGrouping: 'project-directory',
   autoClearAfterMinutes: null,
+  recentlyRemovedEnabled: false,
   maxStatusItemsPerProject: null,
   undoLimit: 3,
 };
@@ -101,6 +102,10 @@ window.fixture = {
       ],
     }));
   },
+  historyEnabled(enabled) {
+    settings.recentlyRemovedEnabled = enabled;
+    window.__TAURI_INTERNALS__.runCallback(listeners.get('settings-update'), { payload: settings });
+  },
   removed() {
     removed = [
       {
@@ -111,6 +116,7 @@ window.fixture = {
         reason: 'Time-based deletion',
       },
     ];
+    this.set(health, entries);
   },
 };
 const mode = new URLSearchParams(location.search).get('mode');

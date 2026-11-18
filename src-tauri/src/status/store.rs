@@ -708,6 +708,14 @@ impl StatusStore {
         self.save_private(&private)
     }
     pub fn apply_retention(&self, rules: &[domain::RetentionRule]) -> Result<bool, StatusError> {
+        self.apply_retention_with_history(rules, true)
+    }
+
+    pub fn apply_retention_with_history(
+        &self,
+        rules: &[domain::RetentionRule],
+        keep_history: bool,
+    ) -> Result<bool, StatusError> {
         let _lock = self.lock()?;
         let mut document = self.read_unlocked()?;
         let before = document.clone();
@@ -715,6 +723,10 @@ impl StatusStore {
         let changed = domain::apply_retention(&mut document, rules, now)
             .map_err(StatusError::InvalidInput)?;
         if changed {
+            if !keep_history {
+                self.save_unlocked(&document)?;
+                return Ok(true);
+            }
             let mut private = self.recover_private()?;
             for entry in before.entries {
                 for (index, point) in entry.points.iter().enumerate() {
@@ -1467,6 +1479,15 @@ mod recovery_tests {
         drop(lock);
         assert!(store.lock_for(Duration::from_millis(20)).is_ok());
     }
+    #[test]
+    fn retention_can_remove_without_archiving() {
+        let (_dir, store) = setup();
+        let rules = [domain::RetentionRule::CountPerProject(1)];
+        assert!(store.apply_retention_with_history(&rules, false).unwrap());
+        assert!(store.list_removed().unwrap().is_empty());
+        assert_eq!(store.preview_retention(&rules).unwrap(), 0);
+    }
+
     #[test]
     fn archive_retention_is_idempotent_and_restore_is_pinned() {
         let (_dir, store) = setup();

@@ -100,21 +100,6 @@
     settings?.projectSortOrder ?? 'project-directory-asc',
     settings?.statusGrouping,
   );
-  $: sessionLabels = new Map(
-    entries
-      .filter(
-        (entry) =>
-          entry.session_id &&
-          entries.some(
-            (other) =>
-              other !== entry &&
-              other.folder_name === entry.folder_name &&
-              other.branch === entry.branch &&
-              other.session_id !== entry.session_id,
-          ),
-      )
-      .map((entry, index) => [entry.session_id!, `Session ${index + 1}`]),
-  );
   $: rows = viewerRows(entries, projects, settings?.statusSortOrder, settings?.statusGrouping);
   $: if (revision >= 0 && health === 'current' && !snapshotPending) {
     const valid = new Set(rows.filter((row) => row.kind !== 'point').map((row) => row.key));
@@ -380,7 +365,6 @@
               {entry}
               {point}
               {now}
-              sessionLabel={sessionLabels.get(entry.session_id ?? '') ?? null}
               last={row.last}
               removing={pendingRemoval.has(row.key)}
               dismissing={dismissing.has(row.key)}
@@ -398,7 +382,9 @@
         </div>
       </div>
     {/each}
-    <RecentlyRemoved onRestored={refreshSnapshot} />
+    {#if settings?.recentlyRemovedEnabled}
+      <RecentlyRemoved {revision} onRestored={refreshSnapshot} />
+    {/if}
     {#if statusError}<p class="status-error" role="alert">{statusError}</p>{/if}
   </section>
 </main>

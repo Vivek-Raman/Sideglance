@@ -77,6 +77,8 @@ pub struct Settings {
     #[serde(default)]
     pub auto_clear_after_minutes: Option<u64>,
     #[serde(default)]
+    pub recently_removed_enabled: bool,
+    #[serde(default)]
     pub max_status_items_per_project: Option<usize>,
     #[serde(default = "default_undo_limit")]
     pub undo_limit: usize,
@@ -113,6 +115,7 @@ impl Default for Settings {
             project_sort_order: default_project_sort_order(),
             status_sort_order: StatusSortOrder::default(),
             auto_clear_after_minutes: None,
+            recently_removed_enabled: false,
             max_status_items_per_project: None,
             undo_limit: default_undo_limit(),
         }
@@ -373,6 +376,8 @@ mod tests {
             r#"{"headerTitle":"repository-branch","headerSubtitle":"none","headerLayout":"repository-first"}"#
         ).unwrap();
         assert_eq!(defaults.status_grouping, StatusGrouping::ProjectDirectory);
+        assert!(!defaults.recently_removed_enabled);
+        assert!(!Settings::default().recently_removed_enabled);
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("settings.json");
         let owner = SettingsOwner::from_path(path.clone()).unwrap();

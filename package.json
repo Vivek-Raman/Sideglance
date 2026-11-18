@@ -21,7 +21,6 @@
     "test:motion": "playwright test tests/viewer-motion.spec.ts",
     "test": "npm run test:rows && npm run test:controller && npm run test:lifecycle && npm run test:retention && npm run check && npm run typecheck && npm run build",
     "test:browser": "playwright test",
-    "audit": "node --test scripts/audit.test.mjs && node scripts/audit.mjs",
     "verify": "npm test && npm run test:browser && npm run format:check"
   },
   "dependencies": {

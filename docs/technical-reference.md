@@ -18,7 +18,7 @@ After upgrading the app, update installed copies of the skill through Settings a
 
 Pin changes use the stable status lock and a recovery journal in the private file. On recovery, a pending write completes only if the raw file still matches its original bytes, or finalizes if the intended bytes already landed. A newer legacy write is preserved, and recovery conservatively retains both previously committed pins and newly pending pins so a crash after the raw commit cannot discard the only copy. Interrupted unpins may remain pinned until retried. Keep both status files together when backing up or recovering; do not delete the private file or copy an old raw backup over active newer data. Lock acquisition fails with an actionable retry error after two seconds.
 
-Automatic deletion archives each removed point before changing status. Recently removed retains up to 30 days and 5 MiB, evicting oldest records first; it is bounded history, not a permanent backup. Archive failures prevent pruning. Restoring an item pins it so the same deletion rule cannot remove it immediately. Conflicting active points are preserved and reported. Retention previews are estimates because incoming reports can change the affected count.
+Recently removed history is optional and disabled by default. When enabled, automatic deletion archives each removed point before changing status. The viewer hides Recently removed when disabled or empty. Disabling history skips new archive records and preserves existing history until it expires. Recently removed retains up to 30 days and 5 MiB, evicting oldest records first; it is bounded history, not a permanent backup. Archive failures prevent pruning. Restoring an item pins it so the same deletion rule cannot remove it immediately. Conflicting active points are preserved and reported. Retention previews are estimates because incoming reports can change the affected count.
 
 Invalid settings are preserved in a unique `settings.invalid-*.backup` file, then validated defaults are loaded with a visible recovery warning. Read/permission errors are reported rather than overwritten. Skill replacements retain hidden `.sideglance.backup-*` directories beside the installation; if replacement is interrupted, quit agents and restore the backup directory to its original name. Config edits preserve permissions and detect changed source bytes immediately before replacement. External editors do not participate in Sideglance locking, so the final check and rename cannot provide an atomic compare-and-swap against arbitrary writers.
 
@@ -62,15 +62,4 @@ The headless MCP uses a current-thread runtime and blocking workers for storage.
 
 Release builds strip symbols. A local macOS executable experiment reduced 18.85 MB to 13.43 MB and passed the temporary-home MCP workload. These are executable sizes, not installer or whole-app measurements. Local target caches and tracked generated schemas are separate from distributed bundle size. LTO and codegen-unit changes have not been adopted without further measurements.
 
-PR checks cover frontend unit/browser/type/format checks, a high-severity npm audit gate, and Rust format/Clippy/tests across macOS, Linux, and Windows. The current npm audit retains two low findings through the latest Svelte build plugin's deepmerge dependency, which handles trusted local compiler configuration. There is no upstream fix reported by npm; recheck the exception on updates. RustSec tooling was unavailable during local remediation. Platform CI and native visibility/minimize/event-delivery behavior require their own verification; Chromium fixtures establish frontend behavior, not native WebKit behavior.
-
-## Build dependency audit exception
-
-CI runs `npm run audit`, which blocks high and critical npm audit findings except
-GHSA-fc5q-39xc-vjpf when every affected dependency is marked development-only in
-the lockfile. This exception was approved on 2026-11-17 because picomatch has no
-patched release. Vite, tinyglobby and svelte-check use it for filename matching
-during development and verification; it is not shipped in the app runtime. The
-vulnerability remains present in build tooling. Avoid untrusted glob patterns.
-Remove the exception when an upstream fix becomes available. Other advisories,
-production dependencies, and audit execution errors still fail the check.
+PR checks cover frontend unit/browser/type/format checks, a high-severity npm audit gate, and Rust format/Clippy/tests across macOS, Linux, and Windows. CI runs `npm audit --audit-level=high` without advisory exceptions. RustSec tooling was unavailable during local remediation. Platform CI and native visibility/minimize/event-delivery behavior require their own verification; Chromium fixtures establish frontend behavior, not native WebKit behavior.
