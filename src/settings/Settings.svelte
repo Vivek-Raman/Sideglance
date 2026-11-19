@@ -21,11 +21,39 @@
   ];
   let scrollContainer: HTMLElement;
   let activeSection = 'appearance';
+  const scrollDuration = 400;
+  let scrollFrame: number | undefined;
+  function cancelScroll() {
+    if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
+    scrollFrame = undefined;
+  }
   function navigateTo(id: string) {
     const target = scrollContainer.querySelector<HTMLElement>(`[data-section="${id}"]`);
     if (!target) return;
-    scrollContainer.scrollTop +=
-      target.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top - 28;
+    cancelScroll();
+    const start = scrollContainer.scrollTop;
+    const destination = Math.max(
+      0,
+      Math.min(
+        start +
+          target.getBoundingClientRect().top -
+          scrollContainer.getBoundingClientRect().top -
+          28,
+        scrollContainer.scrollHeight - scrollContainer.clientHeight,
+      ),
+    );
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      scrollContainer.scrollTop = destination;
+    } else {
+      const startedAt = performance.now();
+      const animate = (now: number) => {
+        const progress = Math.min((now - startedAt) / scrollDuration, 1);
+        const eased = (1 - Math.cos(Math.PI * progress)) / 2;
+        scrollContainer.scrollTop = start + (destination - start) * eased;
+        scrollFrame = progress < 1 ? requestAnimationFrame(animate) : undefined;
+      };
+      scrollFrame = requestAnimationFrame(animate);
+    }
     activeSection = id;
   }
   function trackSection() {
@@ -170,12 +198,15 @@
       () => command('get_settings'),
     );
     return () => {
+      cancelScroll();
       disposed = true;
       systemTheme.removeEventListener('change', onThemeChange);
       subscription.dispose();
     };
   });
 </script>
+
+<svelte:window onpointerdown={cancelScroll} onkeydown={cancelScroll} />
 
 <div class="settings-layout">
   <aside class="settings-sidebar">
@@ -191,7 +222,13 @@
       {/each}
     </nav>
   </aside>
-  <main class="settings-page" bind:this={scrollContainer} onscroll={trackSection}>
+  <main
+    class="settings-page"
+    bind:this={scrollContainer}
+    onscroll={trackSection}
+    onwheel={cancelScroll}
+    ontouchstart={cancelScroll}
+  >
     <div class="settings-content">
       <header>
         <h2 class="page-title">Preferences</h2>

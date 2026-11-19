@@ -1,4 +1,6 @@
 <script lang="ts">
+  import './toolbar-button.css';
+  import SettingsIcon from '@lucide/svelte/icons/settings';
   import Moon from '@lucide/svelte/icons/moon';
   import Sun from '@lucide/svelte/icons/sun';
   import Monitor from '@lucide/svelte/icons/monitor';
@@ -21,6 +23,41 @@
   <span class="development-label">dev</span>
 {/if}
 <div class="document-actions" class:window-unfocused={!windowFocused}>
+  <button
+    class="toolbar-button"
+    onclick={() => void onTheme()}
+    aria-label={`Theme: ${settings?.theme ?? 'system'}. Click to change`}
+    title={`Theme: ${settings?.theme ?? 'system'}`}
+  >
+    {#if settings?.theme === 'dark'}
+      <Moon size={15} stroke-width={1.7} aria-hidden="true" />
+    {:else if settings?.theme === 'light'}
+      <Sun size={15} stroke-width={1.7} aria-hidden="true" />
+    {:else}
+      <Monitor size={15} stroke-width={1.7} aria-hidden="true" />
+    {/if}
+  </button>
+  <button
+    class="toolbar-button"
+    onclick={() => void onTextScale(-1)}
+    disabled={!settings || settings.textScale <= textScales[0]}
+    aria-label="Decrease text size"
+    title="Decrease text size"
+    ><AArrowDown size={15} stroke-width={1.7} aria-hidden="true" /></button
+  >
+  <button
+    class="toolbar-button"
+    onclick={() => void onTextScale(1)}
+    disabled={!settings || settings.textScale >= textScales[textScales.length - 1]}
+    aria-label="Increase text size"
+    title="Increase text size"><AArrowUp size={15} stroke-width={1.7} aria-hidden="true" /></button
+  >
+  <button
+    class="toolbar-button"
+    onclick={() => void onSettings()}
+    aria-label="Settings"
+    title="Settings"><SettingsIcon size={15} stroke-width={1.7} aria-hidden="true" /></button
+  >
   <div class="update-control" class:persistent-update={updatePersistent}>
     <ToolbarUpdateButton
       {updatesEnabled}
@@ -28,54 +65,9 @@
       onPersistentChange={(value) => (updatePersistent = value)}
     />
   </div>
-  <button
-    class="icon-button"
-    onclick={() => void onTheme()}
-    aria-label={`Theme: ${settings?.theme ?? 'system'}. Click to change`}
-    title={`Theme: ${settings?.theme ?? 'system'}`}
-  >
-    {#if settings?.theme === 'dark'}
-      <Moon size={14} aria-hidden="true" />
-    {:else if settings?.theme === 'light'}
-      <Sun size={14} aria-hidden="true" />
-    {:else}
-      <Monitor size={14} aria-hidden="true" />
-    {/if}
-  </button>
-  <button
-    class="icon-button"
-    onclick={() => void onTextScale(-1)}
-    disabled={!settings || settings.textScale <= textScales[0]}
-    aria-label="Decrease text size"
-    title="Decrease text size"><AArrowDown size={14} aria-hidden="true" /></button
-  >
-  <button
-    class="icon-button"
-    onclick={() => void onTextScale(1)}
-    disabled={!settings || settings.textScale >= textScales[textScales.length - 1]}
-    aria-label="Increase text size"
-    title="Increase text size"><AArrowUp size={14} aria-hidden="true" /></button
-  >
-  <button onclick={() => void onSettings()}>Settings</button>
 </div>
 
 <style>
-  button {
-    flex: none;
-    border: 1px solid transparent;
-    border-radius: 0.4rem;
-    padding: 0.5rem 0.7rem;
-    color: var(--text);
-    background: transparent;
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button:disabled {
-    cursor: default;
-    opacity: 0.65;
-  }
   .development-label {
     position: absolute;
     z-index: 2;
@@ -101,24 +93,9 @@
     gap: 0.35rem;
     align-items: center;
   }
-  .document-actions button {
-    padding: 0.28rem 0.5rem;
-    font-size: 0.7rem;
-  }
-  .document-actions button:not(:disabled):hover {
-    border-color: var(--border);
-    color: var(--accent);
-  }
-  .document-actions button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .icon-button {
-    display: inline-flex;
+  .update-control {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    min-width: 1.8rem;
-    padding-inline: 0.35rem !important;
   }
   .document-actions > * {
     transition: opacity 160ms var(--ease-gentle-out);

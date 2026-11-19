@@ -1,4 +1,5 @@
 <script lang="ts">
+  import './toolbar-button.css';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Download from '@lucide/svelte/icons/download';
   import Package from '@lucide/svelte/icons/package';
@@ -179,7 +180,7 @@
 </script>
 
 <button
-  class="update-button"
+  class="toolbar-button"
   class:ready={persistent}
   disabled={!updatesEnabled || busy}
   aria-label={label}
@@ -205,36 +206,6 @@
 >
 
 <style>
-  .update-button {
-    display: grid;
-    place-items: center;
-    min-width: 1.8rem;
-    height: 1.65rem;
-    padding: 0.28rem 0.35rem;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    color: var(--text);
-    background: transparent;
-    cursor: pointer;
-  }
-  .update-button.ready {
-    color: var(--accent);
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: blur(28px) saturate(1.15);
-    -webkit-backdrop-filter: blur(28px) saturate(1.15);
-  }
-  button:not(:disabled):hover {
-    border-color: var(--border);
-    color: var(--accent);
-  }
-  button:disabled {
-    cursor: default;
-    opacity: 0.65;
-  }
-  button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
   .update-icon {
     display: inline-flex;
   }

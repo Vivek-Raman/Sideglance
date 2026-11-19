@@ -189,6 +189,7 @@
     };
     const onBlur = () => {
       windowFocused = false;
+      hoveredHeadings = new Set();
     };
     const onThemeChange = () => {
       if (controller.state.settings?.theme === 'system') applyTheme('system');
@@ -320,10 +321,15 @@
     {/if}
     {#if !rows.length}
       <div class="empty-state">
-        <p>
-          {health === 'current' ? 'No status items yet.' : 'Your agent updates will appear here.'}
-        </p>
-        <button onclick={() => void openSettings()}>Set up agent integration</button>
+        <div class="empty-prompt" aria-hidden="true">
+          <span class="prompt-chevron">›</span><span class="prompt-cursor"></span>
+          <span class="prompt-spark">✦</span>
+        </div>
+        <h2>Make something worth a side glance.</h2>
+        <p>Pick an idea. Put your agent to work.<br />We'll keep an eye on the progress here.</p>
+        <button class="integration-link" onclick={() => void openSettings()}>
+          Review agent integration <span aria-hidden="true">↗</span>
+        </button>
       </div>
     {/if}
     {#each rows as row (row.key)}
@@ -333,6 +339,7 @@
         inert={hiddenRows.has(row.key)}
         aria-hidden={hiddenRows.has(row.key) ? true : undefined}
         onpointerenter={() => hoverRow(row.key)}
+        onpointermove={() => hoverRow(row.key)}
         data-row-key={row.key}
         use:motion.row={row.key}
       >
@@ -341,6 +348,7 @@
             <div
               class="group-heading"
               class:project-heading={row.kind === 'project'}
+              class:window-focused={windowFocused}
               class:is-hovered={hoveredHeadings.has(row.key)}
             >
               {#if row.kind === 'project'}
@@ -464,8 +472,7 @@
     transform: rotate(0);
   }
   .group-heading.is-hovered .collapse-toggle,
-  .group-heading:hover .collapse-toggle,
-  .group-heading:focus-within .collapse-toggle,
+  .group-heading.window-focused:has(:focus-visible) .collapse-toggle,
   .collapse-toggle.is-collapsed {
     opacity: 1;
   }
@@ -573,8 +580,7 @@
     border: 1px solid var(--border);
     border-radius: 6px;
   }
-  .health-notice,
-  .empty-state {
+  .health-notice {
     margin-bottom: 0.8rem;
     padding: 0.65rem;
     border: 1px solid var(--border);
@@ -585,8 +591,71 @@
   .health-notice p {
     margin-top: 0.3rem;
   }
-  .health-notice button,
-  .empty-state button {
+  .health-notice button {
+    color: var(--accent);
+  }
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2.5rem 1rem 2rem;
+    text-align: center;
+  }
+  .empty-prompt {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    width: 4rem;
+    height: 3.25rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    color: var(--accent);
+    transform: rotate(-6deg);
+  }
+  .prompt-chevron {
+    font: 2rem / 1 monospace;
+  }
+  .prompt-cursor {
+    width: 0.8rem;
+    height: 2px;
+    margin-top: 0.9rem;
+    background: currentColor;
+  }
+  .prompt-spark {
+    position: absolute;
+    top: -0.7rem;
+    right: -0.6rem;
+    font-size: 1.35rem;
+  }
+  .empty-state h2 {
+    max-width: 18rem;
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .empty-state p {
+    margin: 0.75rem 0 1.25rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.65;
+    text-wrap: pretty;
+  }
+  .empty-state .integration-link {
+    padding: 0.25rem;
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 400;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .empty-state .integration-link:hover {
     color: var(--accent);
   }
   button:focus-visible {

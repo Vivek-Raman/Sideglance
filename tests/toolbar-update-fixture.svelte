@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+  import type { Settings } from '../src/shared/types';
   import { onMount } from 'svelte';
   import ViewerToolbar from '../src/viewer/ViewerToolbar.svelte';
   let windowFocused = true;
@@ -15,7 +16,7 @@
 </script>
 
 <ViewerToolbar
-  settings={null}
+  settings={{ theme: 'system', textScale: 1 } as Settings}
   {windowFocused}
   updatesEnabled={true}
   onTheme={async () => {}}

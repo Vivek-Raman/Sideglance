@@ -166,3 +166,97 @@ test('late check and download completions release resources after unmount', asyn
     )
     .toEqual([22, 11]);
 });
+
+for (const theme of ['light', 'dark']) {
+  test(`toolbar hover styles match across controls and update stages in ${theme} theme`, async ({
+    page,
+  }) => {
+    await page.evaluate(
+      (theme) => document.documentElement.classList.toggle('dark', theme === 'dark'),
+      theme,
+    );
+    const buttons = page.locator('.document-actions button');
+    await expect(buttons).toHaveCount(5);
+    const style = async (button: ReturnType<typeof page.locator>) =>
+      button.evaluate((element) => {
+        const css = getComputedStyle(element);
+        return Object.fromEntries(
+          [
+            'width',
+            'height',
+            'padding',
+            'border',
+            'borderRadius',
+            'color',
+            'backgroundColor',
+            'backdropFilter',
+            'opacity',
+            'cursor',
+            'outline',
+          ].map((key) => [key, css[key as keyof CSSStyleDeclaration]]),
+        );
+      });
+    const settings = page.getByRole('button', { name: 'Settings', exact: true });
+    await settings.hover();
+    const hovered = await style(settings);
+    for (const button of await buttons.all()) {
+      await button.hover();
+      expect(await style(button)).toEqual(hovered);
+      await button.focus();
+      expect(await button.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
+      await button.blur();
+    }
+    await expect(buttons.last()).toHaveAccessibleName('Check for updates');
+    for (const label of ['Check for updates', 'Download update', 'Install update']) {
+      const update = page.getByRole('button', { name: label, exact: true });
+      await update.hover();
+      expect(await style(update)).toEqual(hovered);
+      if (label === 'Install update')
+        await page.evaluate(() => window.toolbarFixture.fail('restart'));
+      await update.click();
+    }
+    const restart = page.getByRole('button', { name: 'Restart to finish updating', exact: true });
+    await restart.hover();
+    expect(await style(restart)).toEqual(hovered);
+  });
+}
+
+test('disabled text size and busy update controls do not gain hover styles', async ({ page }) => {
+  await page.evaluate(() => {
+    document.querySelectorAll<HTMLButtonElement>('.document-actions > button').forEach((button) => {
+      if (button.getAttribute('aria-label')?.includes('text size')) button.disabled = true;
+    });
+    window.toolbarFixture.defer('check');
+  });
+  for (const label of ['Decrease text size', 'Increase text size']) {
+    const button = page.getByRole('button', { name: label });
+    await button.hover();
+    await expect(button).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    await expect(button).toHaveCSS('cursor', 'default');
+  }
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  const busy = page.getByRole('button', { name: 'Checking for updates', exact: true });
+  await expect(busy).toBeDisabled();
+  await busy.hover();
+  await expect(busy).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+  await expect(busy).toHaveCSS('cursor', 'default');
+});
+
+test('toolbar buttons and icons share a horizontal center line', async ({ page }) => {
+  for (const scale of [0.85, 1, 1.15, 1.35]) {
+    await page.evaluate((scale) => {
+      document.documentElement.style.fontSize = `${14 * scale}px`;
+    }, scale);
+    const centers = await page.locator('.document-actions button').evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const box = button.getBoundingClientRect();
+        const icon = button.querySelector('svg')!.getBoundingClientRect();
+        return { button: box.y + box.height / 2, icon: icon.y + icon.height / 2 };
+      }),
+    );
+    for (const center of centers) {
+      expect(Math.abs(center.button - centers[0].button)).toBeLessThan(0.1);
+      expect(Math.abs(center.icon - centers[0].icon)).toBeLessThan(0.1);
+    }
+  }
+});
