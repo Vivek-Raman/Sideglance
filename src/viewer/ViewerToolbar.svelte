@@ -4,8 +4,8 @@
   import Moon from '@lucide/svelte/icons/moon';
   import Sun from '@lucide/svelte/icons/sun';
   import Monitor from '@lucide/svelte/icons/monitor';
-  import AArrowDown from '@lucide/svelte/icons/a-arrow-down';
-  import AArrowUp from '@lucide/svelte/icons/a-arrow-up';
+  import ZoomOut from '@lucide/svelte/icons/zoom-out';
+  import ZoomIn from '@lucide/svelte/icons/zoom-in';
   import ToolbarUpdateButton from './ToolbarUpdateButton.svelte';
   import type { Settings } from '../shared/types';
   export let settings: Settings | null;
@@ -42,15 +42,14 @@
     onclick={() => void onTextScale(-1)}
     disabled={!settings || settings.textScale <= textScales[0]}
     aria-label="Decrease text size"
-    title="Decrease text size"
-    ><AArrowDown size={15} stroke-width={1.7} aria-hidden="true" /></button
+    title="Decrease text size"><ZoomOut size={15} stroke-width={1.7} aria-hidden="true" /></button
   >
   <button
     class="toolbar-button"
     onclick={() => void onTextScale(1)}
     disabled={!settings || settings.textScale >= textScales[textScales.length - 1]}
     aria-label="Increase text size"
-    title="Increase text size"><AArrowUp size={15} stroke-width={1.7} aria-hidden="true" /></button
+    title="Increase text size"><ZoomIn size={15} stroke-width={1.7} aria-hidden="true" /></button
   >
   <button
     class="toolbar-button"
