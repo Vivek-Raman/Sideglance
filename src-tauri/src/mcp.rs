@@ -1,3 +1,5 @@
+mod project;
+
 use crate::{
     paths,
     status::domain::Point,
@@ -14,12 +16,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct AgentPoint {
+    /// Brief plain text status, without Markdown or commit hashes.
     text: String,
+    /// Set true when this work is complete.
     #[serde(default)]
     done: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional HTTP(S) link; use the canonical PR URL for PR work.
     link: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Preserve returned IDs for existing points; omit for new points.
     id: Option<String>,
 }
 
@@ -50,14 +56,10 @@ impl From<Point> for AgentPoint {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct WriteStatusInput {
-    /// Repository owner/name from the Git remote, such as "owner/repo".
-    repository: Option<String>,
-    /// The current project's folder name, such as "sideglance".
-    folder_name: String,
+    /// Absolute working directory. The server derives project, branch and repository using local Git.
+    working_directory: String,
     /// Your stable session ID from the harness.
     session_id: String,
-    /// Currently checked out branch.
-    branch: String,
     /// Complete revised point list; omitted points are removed.
     points: Vec<AgentPoint>,
 }
@@ -65,8 +67,8 @@ struct WriteStatusInput {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ReadStatusInput {
-    /// The current project's folder name, such as "sideglance".
-    folder_name: String,
+    /// Absolute working directory in the project; subdirectories resolve to the Git checkout root.
+    working_directory: String,
     /// Your stable session ID from the harness.
     session_id: String,
 }
@@ -103,10 +105,12 @@ impl StatusServer {
         Parameters(input): Parameters<ReadStatusInput>,
     ) -> Result<String, McpError> {
         tokio::task::spawn_blocking(move || {
+            let project = project::resolve(&input.working_directory)
+                .map_err(|message| McpError::invalid_params(message, None))?;
             let path = paths::status_path()
                 .map_err(|error| McpError::internal_error(error.to_string(), None))?;
             let entries = StatusStore::new(path)
-                .read_project(&input.folder_name, &input.session_id)
+                .read_project(&project.folder_name, &input.session_id)
                 .map_err(map_status_error)?;
             let points: Vec<AgentPoint> = entries
                 .into_iter()
@@ -128,15 +132,17 @@ impl StatusServer {
         Parameters(input): Parameters<WriteStatusInput>,
     ) -> Result<String, McpError> {
         tokio::task::spawn_blocking(move || {
+            let project = project::resolve(&input.working_directory)
+                .map_err(|message| McpError::invalid_params(message, None))?;
             let path =
                 paths::status_path().map_err(|error| McpError::internal_error(error, None))?;
             let (_, points) = StatusStore::new(path)
-                .upsert_with_repository_result(
-                    input.folder_name.clone(),
+                .upsert_with_resolved_repository_result(
+                    project.folder_name,
                     input.session_id,
-                    input.branch,
+                    project.branch,
                     input.points.into_iter().map(Into::into).collect(),
-                    input.repository,
+                    project.repository,
                 )
                 .map_err(map_status_error)?;
             let points: Vec<AgentPoint> = points.into_iter().map(Into::into).collect();
@@ -252,14 +258,73 @@ mod tests {
     }
 
     #[test]
+    fn tool_inputs_accept_directory_and_reject_agent_metadata() {
+        let read = serde_json::json!({"working_directory": "/project", "session_id": "session"});
+        assert!(serde_json::from_value::<ReadStatusInput>(read.clone()).is_ok());
+        let mut write = read.clone();
+        write["points"] = serde_json::json!([{"text": "working"}]);
+        assert!(serde_json::from_value::<WriteStatusInput>(write.clone()).is_ok());
+        for field in ["folder_name", "branch", "repository"] {
+            let mut value = write.clone();
+            value[field] = serde_json::json!("override");
+            assert!(serde_json::from_value::<WriteStatusInput>(value).is_err());
+            let mut value = read.clone();
+            value[field] = serde_json::json!("override");
+            assert!(serde_json::from_value::<ReadStatusInput>(value).is_err());
+        }
+        for schema in [
+            schemars::schema_for!(ReadStatusInput),
+            schemars::schema_for!(WriteStatusInput),
+        ] {
+            let schema = serde_json::to_value(schema).unwrap();
+            assert!(schema["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|field| field == "working_directory"));
+            for field in ["folder_name", "branch", "repository"] {
+                assert!(schema["properties"].get(field).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn resolved_metadata_updates_existing_session_and_clears_removed_origin() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = StatusStore::new(temp.path().join("status.json"));
+        let save = |repository| {
+            let point: AgentPoint =
+                serde_json::from_value(serde_json::json!({"text": "working"})).unwrap();
+            store
+                .upsert_with_resolved_repository_result(
+                    "project".into(),
+                    "session".into(),
+                    "main".into(),
+                    vec![point.into()],
+                    repository,
+                )
+                .unwrap();
+        };
+        save(None);
+        save(Some("owner/repo".into()));
+        let entries = store.read_project("project", "session").unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].repository.as_deref(), Some("owner/repo"));
+        save(None);
+        assert_eq!(
+            store.read_project("project", "session").unwrap()[0].repository,
+            None
+        );
+    }
+
+    #[test]
     fn both_tools_require_a_string_session_id() {
         for value in [
-            serde_json::json!({"folder_name": "project"}),
-            serde_json::json!({"folder_name": "project", "session_id": null}),
+            serde_json::json!({"working_directory": "/project"}),
+            serde_json::json!({"working_directory": "/project", "session_id": null}),
         ] {
             assert!(serde_json::from_value::<ReadStatusInput>(value.clone()).is_err());
             let mut write = value;
-            write["branch"] = serde_json::json!("main");
             write["points"] = serde_json::json!([{"text": "activity"}]);
             assert!(serde_json::from_value::<WriteStatusInput>(write).is_err());
         }

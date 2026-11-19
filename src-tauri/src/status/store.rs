@@ -508,6 +508,30 @@ impl StatusStore {
         points: Vec<Point>,
         repository: Option<String>,
     ) -> Result<(usize, Vec<Point>), StatusError> {
+        self.upsert_repository_result(folder, session, branch, points, repository, true)
+    }
+
+    /// Git discovery is authoritative, including an absent origin.
+    pub fn upsert_with_resolved_repository_result(
+        &self,
+        folder: String,
+        session: String,
+        branch: String,
+        points: Vec<Point>,
+        repository: Option<String>,
+    ) -> Result<(usize, Vec<Point>), StatusError> {
+        self.upsert_repository_result(folder, session, branch, points, repository, false)
+    }
+
+    fn upsert_repository_result(
+        &self,
+        folder: String,
+        session: String,
+        branch: String,
+        points: Vec<Point>,
+        repository: Option<String>,
+        preserve_repository: bool,
+    ) -> Result<(usize, Vec<Point>), StatusError> {
         let _lock = self.lock()?;
         if !domain::single_line(&folder)
             || !domain::single_line(&session)
@@ -519,11 +543,17 @@ impl StatusStore {
         }
         let mut document = self.read_unlocked()?;
         let repository = repository.or_else(|| {
-            document
-                .entries
-                .iter()
-                .find(|e| e.folder_name == folder && e.session_id.as_deref() == Some(&session))
-                .and_then(|e| e.repository.clone())
+            preserve_repository
+                .then(|| {
+                    document
+                        .entries
+                        .iter()
+                        .find(|e| {
+                            e.folder_name == folder && e.session_id.as_deref() == Some(&session)
+                        })
+                        .and_then(|e| e.repository.clone())
+                })
+                .flatten()
         });
         let identity = (folder.clone(), session.clone());
         domain::upsert(&mut document, folder, session, branch, points, Utc::now())
