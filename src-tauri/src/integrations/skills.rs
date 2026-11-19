@@ -131,6 +131,26 @@ pub(crate) fn skill_hash(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+// Explicitly unlock before closing: a concurrent subprocess can briefly inherit
+// the open file description on Unix and otherwise keep its lock alive.
+struct InstallationLock(fs::File);
+
+impl Drop for InstallationLock {
+    fn drop(&mut self) {
+        let _ = fs2::FileExt::unlock(&self.0);
+    }
+}
+
+fn installation_lock_error(error: std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::WouldBlock
+        || error.raw_os_error() == fs2::lock_contended_error().raw_os_error()
+    {
+        format!("Another skill installation is in progress; retry shortly: {error}")
+    } else {
+        format!("Unable to lock skill installation: {error}")
+    }
+}
+
 pub(crate) fn install_at(source: &Path, destination: &Path) -> Result<bool, String> {
     install_with_rename(source, destination, |from, to| fs::rename(from, to))
 }
@@ -160,8 +180,8 @@ fn install_with_rename(
         .write(true)
         .open(parent.join(format!(".{name}.install.lock")))
         .map_err(|error| error.to_string())?;
-    lock.try_lock_exclusive()
-        .map_err(|_| "Another skill installation is in progress; retry shortly".to_string())?;
+    lock.try_lock_exclusive().map_err(installation_lock_error)?;
+    let _lock = InstallationLock(lock);
     let existing = match fs::symlink_metadata(destination) {
         Ok(metadata) => {
             if !metadata.is_dir()
@@ -280,6 +300,51 @@ mod tests {
         assert_eq!(fs::read_to_string(backup).unwrap(), "custom instructions");
         install_at(&source, &destination).unwrap();
         assert_eq!(fs::read_dir(legacy).unwrap().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn installation_unlocks_even_with_another_open_descriptor() {
+        use fs2::FileExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("install.lock");
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        file.try_lock_exclusive().unwrap();
+        // Models the shared file description inherited during a concurrent fork.
+        let inherited = file.try_clone().unwrap();
+        let guard = InstallationLock(file);
+        let contender = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        assert!(contender.try_lock_exclusive().is_err());
+        drop(guard);
+        contender.try_lock_exclusive().unwrap();
+        FileExt::unlock(&contender).unwrap();
+        drop(inherited);
+    }
+
+    #[test]
+    fn installation_lock_errors_distinguish_contention() {
+        let contention =
+            installation_lock_error(std::io::Error::from(std::io::ErrorKind::WouldBlock));
+        assert!(contention.contains("Another skill installation"));
+        assert!(installation_lock_error(fs2::lock_contended_error())
+            .contains("Another skill installation"));
+        let other = installation_lock_error(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "test lock permission failure",
+        ));
+        assert!(other.contains("Unable to lock skill installation"));
+        assert!(other.contains("test lock permission failure"));
+        assert!(!other.contains("Another skill installation"));
     }
 
     #[test]
