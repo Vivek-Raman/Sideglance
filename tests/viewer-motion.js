@@ -132,7 +132,12 @@ async function motion(name, target, change, interrupted = false) {
     ),
     `${name}: discontinuous motion ${JSON.stringify({ samples, times })}`,
   );
-  assert(Math.abs(samples[0] - before) < 8, `${name}: jumped on first frame`);
+  // The first rAF can arrive after the animation has started. Apply the same
+  // elapsed-time allowance as later frames rather than assuming it is time zero.
+  assert(
+    Math.abs(samples[0] - before) < 8 + maxVelocity * (times[0] - start + 17) * 1.25,
+    `${name}: jumped on first frame ${JSON.stringify({ before, first: samples[0], elapsed: times[0] - start })}`,
+  );
   results.push({ name, before, after, frames: samples.length });
 }
 window.motionResults = (async () => {

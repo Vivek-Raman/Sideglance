@@ -27,7 +27,7 @@ test('loads settings only after navigating to its route', async ({ page }) => {
 
 test('failed settings import offers reload and recovers', async ({ page }) => {
   let fail = true;
-  await page.route('**/src/settings/Settings.svelte', (route) => {
+  await page.route('**/src/settings/Settings.svelte*', (route) => {
     if (fail) {
       fail = false;
       return route.abort();
