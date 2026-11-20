@@ -29,12 +29,12 @@ test('renders release note Markdown and removes unsafe HTML', async ({ page }) =
   await expect(page.locator('script, img, [onclick], [href^="javascript:"]')).toHaveCount(0);
 });
 
-test('updates owns its card and button styles', async ({ page }) => {
+test('updates uses the flat settings section and retains button styles', async ({ page }) => {
   await page.addScriptTag({ type: 'module', url: '/tests/update-settings-fixture.js' });
   const card = page.locator('.settings-group');
   await expect(card).toHaveCSS('display', 'grid');
-  await expect(card).toHaveCSS('border-top-width', '1px');
-  await expect(card).toHaveCSS('padding-top', '17.6px');
+  await expect(card).toHaveCSS('border-top-width', '0px');
+  await expect(card).toHaveCSS('padding-top', '0px');
   await expect(page.getByRole('button', { name: 'Check for updates' })).toHaveCSS(
     'font-weight',
     '600',

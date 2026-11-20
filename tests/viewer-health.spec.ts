@@ -80,8 +80,9 @@ test('enabling deletion requires a preview and explicit apply', async ({ page })
 });
 test('configured integrations offer read-only connection testing and repair', async ({ page }) => {
   await page.goto('/tests/health.html?mode=integrations');
+  await page.getByText('Details', { exact: true }).click();
   await page.getByRole('button', { name: 'Test connection' }).click();
-  await expect(page.getByRole('status')).toContainText('Connected:');
+  await expect(page.getByRole('status')).toContainText('Connection test passed:');
   await expect(page.getByRole('button', { name: 'Repair MCP' })).toBeVisible();
 });
 

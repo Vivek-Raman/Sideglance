@@ -45,7 +45,41 @@ pub(crate) fn install_menu(app: &tauri::App) -> tauri::Result<()> {
 }
 
 pub(crate) fn show_settings_window(app: &AppHandle) -> tauri::Result<()> {
+    show_settings_section(app, None)
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum SettingsSection {
+    Appearance,
+    Board,
+    Agents,
+    App,
+}
+
+impl SettingsSection {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Appearance => "appearance",
+            Self::Board => "board",
+            Self::Agents => "agents",
+            Self::App => "app",
+        }
+    }
+}
+
+pub(crate) fn show_settings_section(
+    app: &AppHandle,
+    section: Option<SettingsSection>,
+) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("settings") {
+        if let Some(section) = section {
+            // The section comes from a closed enum, never arbitrary script input.
+            window.eval(format!(
+                "window.location.hash = '/settings?section={}';",
+                section.name()
+            ))?;
+        }
         window.show()?;
         return window.set_focus();
     }
@@ -53,7 +87,14 @@ pub(crate) fn show_settings_window(app: &AppHandle) -> tauri::Result<()> {
         let window = WebviewWindowBuilder::new(
             app,
             "settings",
-            WebviewUrl::App("index.html#/settings".into()),
+            WebviewUrl::App(
+                section
+                    .map_or_else(
+                        || "index.html#/settings".to_owned(),
+                        |section| format!("index.html#/settings?section={}", section.name()),
+                    )
+                    .into(),
+            ),
         )
         .title("Sideglance Settings")
         .inner_size(960.0, 720.0)

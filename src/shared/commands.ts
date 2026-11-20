@@ -16,7 +16,10 @@ type CommandMap = {
   };
   get_settings: { args: undefined; result: Settings };
   reset_settings: { args: undefined; result: Settings };
-  open_settings: { args: undefined; result: void };
+  open_settings: {
+    args: { section?: 'appearance' | 'board' | 'agents' | 'app' } | undefined;
+    result: void;
+  };
   set_appearance_settings: {
     args: { theme: Settings['theme']; primaryColor: string; textScale: number };
     result: void;
@@ -72,7 +75,9 @@ type CommandMap = {
 
 export function command<K extends keyof CommandMap>(
   name: K,
-  ...args: CommandMap[K]['args'] extends undefined ? [] : [args: CommandMap[K]['args']]
+  ...args: undefined extends CommandMap[K]['args']
+    ? [args?: CommandMap[K]['args']]
+    : [args: CommandMap[K]['args']]
 ): Promise<CommandMap[K]['result']> {
   return invoke<CommandMap[K]['result']>(name, args[0]);
 }

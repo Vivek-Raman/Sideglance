@@ -23,12 +23,12 @@ Status data stays on your machine. The bundled MCP server receives reports even 
 ## Get started
 
 1. Download a desktop bundle for your platform from [Releases](https://github.com/Vivek-Raman/Sideglance/releases). Release builds target macOS, Windows, and Linux.
-2. Install and open Sideglance, then open **Settings → Agent integration**.
-3. Install the bundled skill and configure MCP for your agent. Codex and Claude Code both have setup support for these two steps.
+2. Install and open Sideglance, then open **Settings → Agents**.
+3. Select **Set up** beside your agent. Sideglance installs the supported components and checks the MCP connection where available.
 4. Restart your agent client if needed to load its new configuration, then start a fresh conversation.
 5. Ask your agent: "Use the sideglance skill to report this task in Sideglance."
 
-Use **Test connection** in Agent integration to check a new MCP connection without publishing a report. Existing sessions still need a restart after updating.
+Expand an agent's **Details** to use **Test connection** without publishing a report. Existing sessions still need a restart after updating.
 
 Reporting requires a real session ID from the agent client. Configuration alone does not prove reporting works; confirm that your first update appears in the board.
 
@@ -62,7 +62,7 @@ The app identifier has changed, so operating-system window placement and permiss
 
 ## Updates
 
-Select **Check for updates** in Settings to look for a newer stable release. Sideglance downloads and verifies a signed update before installing it. Windows restarts through its installer. macOS and Linux ask you to restart Sideglance after installation.
+Select **Check for updates** in **Settings → App** to look for a newer stable release. Sideglance downloads and verifies a signed update before installing it. Windows restarts through its installer. macOS and Linux ask you to restart Sideglance after installation.
 
 The first macOS installation still needs the [quarantine command above](#installing-on-macos) because Sideglance is not notarized. The updater is designed to avoid repeating that command, but verify this on your macOS version before relying on it. Linux self-updates apply to the AppImage bundle. Installations managed by a package manager should update through that package manager.
 

@@ -5,7 +5,7 @@ use std::{
 use tauri::{AppHandle, Manager, State};
 
 use crate::{
-    desktop::windows::show_settings_window,
+    desktop::windows::{show_settings_section, SettingsSection},
     integrations::config::{
         install_claude_mcp, register_codex_mcp, register_codex_mcp_at, register_opencode_mcp,
         register_standard_json_mcp, uninstall_claude_mcp, unregister_codex_mcp_at,
@@ -172,8 +172,11 @@ pub(crate) async fn reset_settings(
 }
 
 #[tauri::command]
-pub(crate) fn open_settings(app: AppHandle) -> Result<(), String> {
-    show_settings_window(&app).map_err(|error| error.to_string())
+pub(crate) fn open_settings(
+    app: AppHandle,
+    section: Option<SettingsSection>,
+) -> Result<(), String> {
+    show_settings_section(&app, section).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

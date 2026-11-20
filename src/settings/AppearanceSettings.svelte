@@ -3,22 +3,10 @@
   import type { Settings } from '../shared/types';
   export let settings: Settings;
   export let primaryColors: { name: string; value: string }[] = [];
-  export let onGroupingSave: () => void;
   export let onSave: () => void;
 </script>
 
 <section class="settings-group appearance">
-  <div class="group-heading">
-    <h2>Appearance</h2>
-    <p>Set the colors, text size, and project headers used in the viewer.</p>
-  </div>
-  <div class="setting-row">
-    <label for="status-grouping">Group status items by</label>
-    <select id="status-grouping" bind:value={settings.statusGrouping} onchange={onGroupingSave}>
-      <option value="project-directory">Directory → branch</option>
-      <option value="repository">Repository → branch</option>
-    </select>
-  </div>
   <div class="setting-row">
     <label for="theme">Theme</label><select id="theme" bind:value={settings.theme} onchange={onSave}
       ><option value="system">System</option><option value="light">Light</option><option
@@ -61,20 +49,22 @@
       ><option value={1.35}>Extra large</option></select
     >
   </div>
+  <div class="sample" style:font-size={`${settings.textScale}em`}>
+    <span>sideglance</span><strong>Project update</strong><small>Ready for review</small>
+  </div>
 </section>
 
 <style>
-  .settings-group h2 {
-    margin: 0;
-    font-size: 1rem;
-  }
-  .group-heading {
+  .sample {
     display: grid;
-    gap: 0.1rem;
+    gap: 0.25rem;
+    padding: 0.8rem 1rem;
+    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--text) 4%, transparent);
   }
-  .group-heading p {
+  .sample span,
+  .sample small {
     color: var(--muted);
-    margin: 0.4rem 0 0;
   }
   .setting-row {
     display: grid;

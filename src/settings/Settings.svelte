@@ -12,62 +12,25 @@
   import AgentIntegrations from '../integrations/AgentIntegrations.svelte';
   const sections = [
     { id: 'appearance', label: 'Appearance' },
-    { id: 'viewer', label: 'Viewer' },
-    { id: 'undo', label: 'Undo dismissals' },
-    { id: 'status', label: 'Status' },
-    { id: 'integrations', label: 'Agent integration' },
-    { id: 'updates', label: 'Updates' },
-    { id: 'reset', label: 'Reset settings' },
+    { id: 'board', label: 'Board' },
+    { id: 'agents', label: 'Agents' },
+    { id: 'app', label: 'App' },
   ];
-  let scrollContainer: HTMLElement;
-  let activeSection = 'appearance';
-  const scrollDuration = 400;
-  let scrollFrame: number | undefined;
-  function cancelScroll() {
-    if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
-    scrollFrame = undefined;
+  function sectionFromHash() {
+    const value = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('section');
+    return sections.some((section) => section.id === value) ? value! : 'appearance';
   }
+  let activeSection = sectionFromHash();
   function navigateTo(id: string) {
-    const target = scrollContainer.querySelector<HTMLElement>(`[data-section="${id}"]`);
-    if (!target) return;
-    cancelScroll();
-    const start = scrollContainer.scrollTop;
-    const destination = Math.max(
-      0,
-      Math.min(
-        start +
-          target.getBoundingClientRect().top -
-          scrollContainer.getBoundingClientRect().top -
-          28,
-        scrollContainer.scrollHeight - scrollContainer.clientHeight,
-      ),
-    );
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      scrollContainer.scrollTop = destination;
-    } else {
-      const startedAt = performance.now();
-      const animate = (now: number) => {
-        const progress = Math.min((now - startedAt) / scrollDuration, 1);
-        const eased = (1 - Math.cos(Math.PI * progress)) / 2;
-        scrollContainer.scrollTop = start + (destination - start) * eased;
-        scrollFrame = progress < 1 ? requestAnimationFrame(animate) : undefined;
-      };
-      scrollFrame = requestAnimationFrame(animate);
-    }
     activeSection = id;
-  }
-  function trackSection() {
-    const top = scrollContainer.getBoundingClientRect().top + 60;
-    let current = sections[0].id;
-    for (const section of sections) {
-      const target = scrollContainer.querySelector(`[data-section="${section.id}"]`);
-      if (target && target.getBoundingClientRect().top <= top) current = section.id;
-    }
-    activeSection = current;
+    window.location.hash = `/settings?section=${id}`;
   }
   let settings: Settings | null = null;
   let saving = false;
-  let settingsError = '';
+  let appearanceError = '';
+  let boardError = '';
+  let appError = '';
+  let loadError = '';
   let integrationsError = '';
   let resetVersion = 0;
   let settingsGeneration = 0;
@@ -88,37 +51,37 @@
   async function saveAppearanceSettings() {
     if (!settings) return;
     saving = true;
-    settingsError = '';
+    appearanceError = '';
     try {
       await saveAppearance(settings);
     } catch (error) {
-      settingsError = errorText(error);
+      appearanceError = errorText(error);
     } finally {
       saving = false;
     }
   }
   async function saveGrouping() {
     if (!settings) return;
-    settingsError = '';
+    boardError = '';
     try {
       await command('set_status_grouping', {
         statusGrouping: settings.statusGrouping,
       });
     } catch (error) {
-      settingsError = errorText(error);
+      boardError = errorText(error);
     }
   }
   async function saveUndoLimit(value: number) {
     if (!Number.isInteger(value) || value < 1 || value > 100) {
-      settingsError = 'Undo history must be between 1 and 100 items';
+      appError = 'Undo history must be between 1 and 100 items';
       return;
     }
     saving = true;
-    settingsError = '';
+    appError = '';
     try {
       await command('set_undo_limit', { undoLimit: value });
     } catch (error) {
-      settingsError = errorText(error);
+      appError = errorText(error);
     } finally {
       saving = false;
     }
@@ -126,11 +89,11 @@
   async function saveSortOrder() {
     if (!settings) return;
     saving = true;
-    settingsError = '';
+    boardError = '';
     try {
       await command('set_project_sort_order', { projectSortOrder: settings.projectSortOrder });
     } catch (error) {
-      settingsError = errorText(error);
+      boardError = errorText(error);
     } finally {
       saving = false;
     }
@@ -138,11 +101,11 @@
   async function saveStatusSortOrder() {
     if (!settings) return;
     saving = true;
-    settingsError = '';
+    boardError = '';
     try {
       await command('set_status_sort_order', { statusSortOrder: settings.statusSortOrder });
     } catch (error) {
-      settingsError = errorText(error);
+      boardError = errorText(error);
     } finally {
       saving = false;
     }
@@ -150,11 +113,11 @@
   async function savePinnedSetting(pinned: boolean) {
     const editGeneration = settingsGeneration;
     saving = true;
-    settingsError = '';
+    boardError = '';
     try {
       await savePinned(pinned);
     } catch (error) {
-      settingsError = errorText(error);
+      boardError = errorText(error);
       if (settings && settingsGeneration === editGeneration && settings.pinned === pinned) {
         settings.pinned = !pinned;
       }
@@ -164,14 +127,14 @@
   }
   async function resetSettings() {
     saving = true;
-    settingsError = '';
+    appError = '';
     try {
       settings = await command('reset_settings');
       resetVersion += 1;
       applyTheme(settings.theme);
       applyPrimaryColor(settings.primaryColor);
     } catch (error) {
-      settingsError = errorText(error);
+      appError = errorText(error);
     } finally {
       saving = false;
     }
@@ -193,12 +156,11 @@
         if (!disposed) applySettings(value);
       },
       (error) => {
-        if (!disposed) settingsError = errorText(error);
+        if (!disposed) loadError = errorText(error);
       },
       () => command('get_settings'),
     );
     return () => {
-      cancelScroll();
       disposed = true;
       systemTheme.removeEventListener('change', onThemeChange);
       subscription.dispose();
@@ -206,8 +168,7 @@
   });
 </script>
 
-<svelte:window onpointerdown={cancelScroll} onkeydown={cancelScroll} />
-
+<svelte:window onhashchange={() => (activeSection = sectionFromHash())} />
 <div class="settings-layout">
   <aside class="settings-sidebar">
     <h1>Settings</h1>
@@ -215,66 +176,48 @@
       {#each sections as section}
         <button
           class:active={activeSection === section.id}
-          aria-current={activeSection === section.id ? 'location' : undefined}
-          disabled={!settings}
+          aria-current={activeSection === section.id ? 'page' : undefined}
           onclick={() => navigateTo(section.id)}>{section.label}</button
         >
       {/each}
     </nav>
   </aside>
-  <main
-    class="settings-page"
-    bind:this={scrollContainer}
-    onscroll={trackSection}
-    onwheel={cancelScroll}
-    ontouchstart={cancelScroll}
-  >
+  <main class="settings-page">
     <div class="settings-content">
       <header>
-        <h2 class="page-title">Preferences</h2>
-        <p>Choose what Sideglance shows and how it appears.</p>
+        <h2 class="page-title">
+          {sections.find((section) => section.id === activeSection)?.label}
+        </h2>
       </header>
       {#if settings}
-        <div data-section="appearance">
+        {#if activeSection === 'appearance'}
           <AppearanceSettings
             {settings}
             {primaryColors}
-            onGroupingSave={() => void saveGrouping()}
             onSave={() => void saveAppearanceSettings()}
           />
-        </div>
-        <section data-section="viewer" class="settings-group">
-          <div class="group-heading">
-            <h2>Viewer</h2>
-            <p>Keep the viewer above other windows.</p>
-          </div>
-          <label class="checkbox"
-            ><input
-              type="checkbox"
-              bind:checked={settings.pinned}
-              onchange={() => void savePinnedSetting(settings!.pinned)}
-            /> Keep viewer always on top</label
-          >
-        </section>
-        <section data-section="undo" class="settings-group">
-          <div class="group-heading">
-            <h2>Undo dismissals</h2>
-            <p>Keep the most recent manually dismissed lines for this viewer session.</p>
-          </div>
-          <label
-            >Undo history size
-            <input
-              type="number"
-              min="1"
-              max="100"
-              step="1"
-              value={settings.undoLimit}
-              disabled={saving}
-              onchange={(event) => void saveUndoLimit(Number(event.currentTarget.value))}
-            />
-          </label>
-        </section>
-        <div data-section="status">
+        {:else if activeSection === 'board'}
+          <section class="settings-group">
+            <div class="setting-row">
+              <label for="status-grouping">Group status items by</label>
+              <select
+                id="status-grouping"
+                bind:value={settings.statusGrouping}
+                onchange={() => void saveGrouping()}
+              >
+                <option value="project-directory">Directory → branch</option><option
+                  value="repository">Repository → branch</option
+                >
+              </select>
+            </div>
+            <label class="checkbox"
+              ><input
+                type="checkbox"
+                bind:checked={settings.pinned}
+                onchange={() => void savePinnedSetting(settings!.pinned)}
+              /> Keep viewer always on top</label
+            >
+          </section>
           <RetentionSettings
             {settings}
             {saving}
@@ -282,27 +225,48 @@
             onSaved={(minutes) => {
               if (settings) settings.autoClearAfterMinutes = minutes;
             }}
-            onError={(error) => (settingsError = errorText(error))}
+            onError={(error) => (boardError = errorText(error))}
             onSortChange={() => void saveSortOrder()}
             onStatusSortChange={() => void saveStatusSortOrder()}
           />
-        </div>
-        <div data-section="integrations">
+        {:else if activeSection === 'agents'}
           <AgentIntegrations onError={(error) => (integrationsError = errorText(error))} />
-          {#if integrationsError}<p class="error">{integrationsError}</p>{/if}
-        </div>
-        <div data-section="updates"><UpdateSettings /></div>
-        <section data-section="reset" class="reset settings-group">
-          <div>
-            <h2>Reset settings</h2>
-            <p>Restore appearance, viewer, and status settings.</p>
-          </div>
-          <button onclick={() => void resetSettings()} disabled={saving}>Reset settings</button>
-        </section>
-        {#if saving}<p class="status">Saving…</p>{/if}{#if settingsError}<p class="error">
-            {settingsError}
-          </p>{/if}
+          {#if integrationsError}<p class="error" role="alert">{integrationsError}</p>{/if}
+        {:else}
+          <UpdateSettings />
+          <details class="settings-group">
+            <summary>Advanced</summary>
+            <label
+              >Undo history size <input
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                value={settings.undoLimit}
+                disabled={saving}
+                onchange={(event) => void saveUndoLimit(Number(event.currentTarget.value))}
+              /></label
+            >
+            <p>Keep recently dismissed items for this viewer session.</p>
+          </details>
+          <section class="reset settings-group">
+            <div>
+              <h2>Reset settings</h2>
+              <p>Restore appearance, viewer, and status settings.</p>
+            </div>
+            <button onclick={() => void resetSettings()} disabled={saving}>Reset settings</button>
+          </section>
+        {/if}
+        {#if saving}<p class="status" role="status">Saving…</p>{/if}
       {/if}
+      {#if loadError}<p class="error" role="alert">{loadError}</p>{/if}
+      {#if activeSection === 'appearance' && appearanceError}<p class="error" role="alert">
+          {appearanceError}
+        </p>{/if}
+      {#if activeSection === 'board' && boardError}<p class="error" role="alert">
+          {boardError}
+        </p>{/if}
+      {#if activeSection === 'app' && appError}<p class="error" role="alert">{appError}</p>{/if}
     </div>
   </main>
 </div>
@@ -345,7 +309,7 @@
     background: color-mix(in srgb, var(--accent) 14%, transparent);
   }
   nav button:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring, var(--accent));
     outline-offset: -2px;
   }
   .settings-page {
@@ -371,18 +335,27 @@
   .settings-page h2 {
     font-size: 1rem;
   }
-  .settings-page header p,
   .reset p {
     color: var(--muted);
     margin: 0.4rem 0 0;
   }
-  .group-heading {
+  .setting-row {
     display: grid;
-    gap: 0.1rem;
+    grid-template-columns: minmax(150px, 1fr) minmax(0, 2fr);
+    align-items: center;
+    gap: 1rem;
   }
-  .group-heading p {
+  select,
+  input[type='number'] {
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    padding: 0.55rem;
+    color: var(--text);
+    background: var(--bg);
+    font: inherit;
+  }
+  details p {
     color: var(--muted);
-    margin: 0.4rem 0 0;
   }
   .checkbox {
     display: flex;
