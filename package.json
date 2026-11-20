@@ -19,9 +19,10 @@
     "test:lifecycle": "node --experimental-strip-types --test tests/settings-lifecycle.test.ts tests/update-schedule.test.ts",
     "test:retention": "node --experimental-strip-types --test tests/settings-retention.test.ts",
     "test:motion": "playwright test tests/viewer-motion.spec.ts",
-    "test": "npm run test:rows && npm run test:controller && npm run test:lifecycle && npm run test:retention && npm run check && npm run typecheck && npm run build",
+    "test": "npm run test:accent && npm run test:rows && npm run test:controller && npm run test:lifecycle && npm run test:retention && npm run check && npm run typecheck && npm run build",
     "test:browser": "playwright test",
-    "verify": "npm test && npm run test:browser && npm run format:check"
+    "verify": "npm test && npm run test:browser && npm run format:check",
+    "test:accent": "node --experimental-strip-types --test tests/accent.test.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",

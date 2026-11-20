@@ -481,7 +481,7 @@
     color: var(--text);
   }
   .collapse-toggle:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
   }
   @media (hover: none) {
@@ -545,10 +545,10 @@
     white-space: nowrap;
   }
   .undo-notice button {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .undo-notice button:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
   }
   .undo-countdown {
     position: absolute;
@@ -592,7 +592,7 @@
     margin-top: 0.3rem;
   }
   .health-notice button {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .empty-state {
     display: flex;
@@ -613,7 +613,7 @@
     border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
     border-radius: 0.75rem;
     background: color-mix(in srgb, var(--accent) 8%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
     transform: rotate(-6deg);
   }
   .prompt-chevron {
@@ -656,10 +656,10 @@
     text-underline-offset: 3px;
   }
   .empty-state .integration-link:hover {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   button:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
   .status-error {

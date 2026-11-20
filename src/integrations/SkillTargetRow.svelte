@@ -42,7 +42,7 @@
     color: var(--muted);
   }
   .skill-target > span.installed {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .skill-target > button {
     grid-area: action;

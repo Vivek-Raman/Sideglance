@@ -46,7 +46,7 @@
     overflow-wrap: anywhere;
   }
   button:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
   .agent {
@@ -66,7 +66,7 @@
     color: var(--muted);
   }
   .agent > span.mcp-registered {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent > button {
     grid-area: action;

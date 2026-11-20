@@ -192,7 +192,7 @@
     opacity: 0.65;
   }
   button:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
   .status {
@@ -234,7 +234,7 @@
     padding-left: 1.5rem;
   }
   .release-notes :global(a) {
-    color: var(--accent);
+    color: var(--accent-text);
     text-decoration: underline;
   }
   .release-notes :global(pre) {

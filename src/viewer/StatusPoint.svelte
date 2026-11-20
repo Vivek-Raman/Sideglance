@@ -93,6 +93,7 @@
   .status-point {
     position: relative;
     line-height: 1.25;
+    overflow-wrap: anywhere;
     transition: opacity 160ms var(--ease-gentle-out);
   }
   .status-point.removing {
@@ -142,10 +143,10 @@
   }
   .pin-point.active,
   .pin-point:hover {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .pin-point:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
   }
   .dismiss-point {
     display: inline-flex;
@@ -164,7 +165,7 @@
     background: color-mix(in srgb, #c43d35 12%, transparent);
   }
   .dismiss-point:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
 </style>

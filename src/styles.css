@@ -5,6 +5,8 @@
   --muted: #6b6f76;
   --border: #dedfe2;
   --accent: #c98c5a;
+  --accent-text: #936037;
+  --focus-ring: #ab7346;
   --code: #f0f1f4;
   --text-scale: 1;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -17,6 +19,8 @@
   --muted: #a8abb2;
   --border: #47494e;
   --code: #34363b;
+  --accent-text: #c98c5a;
+  --focus-ring: #c98c5a;
 }
 * {
   box-sizing: border-box;
@@ -158,5 +162,5 @@ main::after {
   padding-inline-start: 1.25em;
 }
 .document a {
-  color: var(--accent);
+  color: var(--accent-text);
 }
