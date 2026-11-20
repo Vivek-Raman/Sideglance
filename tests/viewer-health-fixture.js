@@ -63,7 +63,7 @@ mockIPC((name, args) => {
           name: 'Codex',
           mcpRegistered: true,
           configurationValid: true,
-          skillInstalled: false,
+          skillInstalled: new URLSearchParams(location.search).has('configured'),
           available: true,
           configPath: '/fixture/config.toml',
           error: null,

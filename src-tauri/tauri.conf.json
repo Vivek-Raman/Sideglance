@@ -17,7 +17,7 @@
         "title": "Sideglance",
         "width": 360,
         "height": 220,
-        "minWidth": 260,
+        "minWidth": 280,
         "minHeight": 120,
         "resizable": true,
         "alwaysOnTop": true,

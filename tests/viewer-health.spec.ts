@@ -9,10 +9,21 @@ test.beforeEach(async ({ page }) => {
     }),
   );
 });
+test('configured empty boards explain the next step and open agent settings', async ({ page }) => {
+  await page.goto('/tests/health.html?configured');
+  await expect(page.getByRole('heading', { name: 'Ready for an update' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up an agent' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Manage agents' }).click();
+  expect(
+    await page.evaluate(
+      () => window.fixture.calls.find((call) => call.name === 'open_settings')?.args,
+    ),
+  ).toEqual({ section: 'agents' });
+});
 test('empty, healthy, stale and paused updates remain understandable', async ({ page }) => {
   await page.goto('/tests/health.html');
   await expect(page.getByText('Waiting for updates', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Review agent integration' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up an agent' })).toBeVisible();
   await page.evaluate(() => window.fixture.set('current', window.fixture.entries()));
   await expect(page.getByText('Point 1', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Session \d+$/)).toHaveCount(0);
@@ -34,7 +45,7 @@ test('empty, healthy, stale and paused updates remain understandable', async ({ 
 });
 test('collapsed groups survive reload and archive restoration is explicit', async ({ page }) => {
   await page.goto('/tests/health.html');
-  await expect(page.getByRole('button', { name: 'Review agent integration' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up an agent' })).toBeVisible();
   await page.evaluate(() => window.fixture.set('current', window.fixture.entries()));
   await page.getByRole('button', { name: 'Collapse project', exact: true }).focus();
   await page.getByRole('button', { name: 'Collapse project', exact: true }).press('Enter');
@@ -42,7 +53,7 @@ test('collapsed groups survive reload and archive restoration is explicit', asyn
     page.locator('.motion-row').filter({ has: page.getByText('Point 1', { exact: true }) }),
   ).toHaveAttribute('aria-hidden', 'true');
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Review agent integration' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up an agent' })).toBeVisible();
   await page.evaluate(() => {
     window.fixture.set('current', window.fixture.entries());
     window.fixture.historyEnabled(true);
@@ -88,7 +99,7 @@ test('configured integrations offer read-only connection testing and repair', as
 
 test('recently removed is opt-in and hidden when empty', async ({ page }) => {
   await page.goto('/tests/health.html');
-  await expect(page.getByRole('button', { name: 'Review agent integration' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up an agent' })).toBeVisible();
   await page.evaluate(() => window.fixture.removed());
   await expect(page.getByText('Recently removed', { exact: true })).toHaveCount(0);
   await page.evaluate(() => window.fixture.historyEnabled(true));
@@ -96,7 +107,7 @@ test('recently removed is opt-in and hidden when empty', async ({ page }) => {
   await page.evaluate(() => window.fixture.historyEnabled(false));
   await expect(page.getByText('Recently removed', { exact: true })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Review agent integration' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up an agent' })).toBeVisible();
   await page.evaluate(() => window.fixture.historyEnabled(true));
   await expect(page.getByText('Recently removed', { exact: true })).toHaveCount(0);
 });
@@ -125,4 +136,30 @@ test('heading arrows clear stale hover and keyboard focus when the window blurs'
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(project).toHaveCSS('opacity', '1');
   await expect(branch).toHaveCSS('opacity', '0');
+});
+
+test('compact viewer keeps content readable and setup opens agent settings', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 220 });
+  await page.goto('/tests/health.html');
+  await page.getByRole('button', { name: 'Set up an agent' }).click();
+  expect(
+    await page.evaluate(
+      () => window.fixture.calls.find((call) => call.name === 'open_settings')?.args,
+    ),
+  ).toEqual({ section: 'agents' });
+  await page.evaluate(() => window.fixture.set('current', window.fixture.entries()));
+  await expect(page.locator('.line-art, .bottom-line-art')).toHaveCount(0);
+  await expect(page.locator('.document')).toHaveCSS('mask-image', 'none');
+  expect((await page.locator('.status-point').first().boundingBox())!.width).toBeGreaterThan(250);
+  await page.setViewportSize({ width: 280, height: 220 });
+  await page.evaluate(() => {
+    const text = document.querySelector('.point-text');
+    text!.textContent = 'https://example.com/' + 'longurl'.repeat(40);
+  });
+  expect(
+    await page
+      .locator('.document')
+      .evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(280);
 });

@@ -67,6 +67,22 @@
   let selectedText = false;
   let revision = -1;
   let snapshotPending = false;
+  let hasConfiguredAgent = false;
+  let viewerDisposed = false;
+  async function refreshAgentSetup() {
+    if (rows.length) return;
+    try {
+      const installation = await command('get_skill_installation');
+      if (!viewerDisposed) {
+        hasConfiguredAgent = [
+          ...(installation?.agents ?? []),
+          ...(installation?.additionalAgents ?? []),
+        ].some((agent) => agent.skillInstalled && agent.mcpRegistered && agent.configurationValid);
+      }
+    } catch {
+      // Setup remains available if the integration status cannot be read.
+    }
+  }
   function resumeUpdates() {
     document.getSelection()?.removeAllRanges();
     controller.setSelection(false);
@@ -170,9 +186,10 @@
       }
     }
   }
-  async function openSettings() {
+  async function openSettings(section?: 'agents') {
     try {
-      await command('open_settings');
+      if (section) await command('open_settings', { section });
+      else await command('open_settings');
     } catch (error) {
       controller.setErrorForView(error);
     }
@@ -186,6 +203,7 @@
     window.addEventListener('keydown', onKeyDown);
     const onFocus = () => {
       windowFocused = true;
+      void refreshAgentSetup();
     };
     const onBlur = () => {
       windowFocused = false;
@@ -196,6 +214,7 @@
     };
     const onSelection = () => controller.setSelection(Boolean(document.getSelection()?.toString()));
     windowFocused = document.hasFocus();
+    void refreshAgentSetup();
     window.addEventListener('focus', onFocus);
     window.addEventListener('blur', onBlur);
     systemTheme.addEventListener('change', onThemeChange);
@@ -243,6 +262,7 @@
     });
     return () => {
       tornDown = true;
+      viewerDisposed = true;
       window.removeEventListener('keydown', onKeyDown);
       if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
       window.clearInterval(refreshNow);
@@ -260,14 +280,14 @@
 </script>
 
 <main>
-  <ViewerArtwork />
+  {#if !rows.length}<ViewerArtwork />{/if}
   <div class="app-chrome" data-tauri-drag-region aria-hidden="true"></div>
   <ViewerToolbar
     {settings}
     {windowFocused}
     onTheme={cycleTheme}
     onTextScale={changeTextScale}
-    onSettings={openSettings}
+    onSettings={() => openSettings()}
   />
   {#if undoNotice}
     <div
@@ -325,10 +345,14 @@
           <span class="prompt-chevron">›</span><span class="prompt-cursor"></span>
           <span class="prompt-spark">✦</span>
         </div>
-        <h2>Make something worth a side glance.</h2>
-        <p>Pick an idea. Put your agent to work.<br />We'll keep an eye on the progress here.</p>
-        <button class="integration-link" onclick={() => void openSettings()}>
-          Review agent integration <span aria-hidden="true">↗</span>
+        <h2>{hasConfiguredAgent ? 'Ready for an update' : 'Connect your coding agent'}</h2>
+        <p>
+          {hasConfiguredAgent
+            ? 'Ask your agent to report this task using Sideglance.'
+            : 'Set up an agent to see its progress here.'}
+        </p>
+        <button class="integration-link" onclick={() => void openSettings('agents')}>
+          {hasConfiguredAgent ? 'Manage agents' : 'Set up an agent'}
         </button>
       </div>
     {/if}
@@ -402,25 +426,8 @@
     --ease-gentle-out: cubic-bezier(0.22, 1, 0.36, 1);
   }
   .document {
-    --bottom-text-fade: clamp(64px, 20vh, 124px);
     overflow-anchor: none;
-    padding: 17px 19px;
-    padding-bottom: calc(var(--bottom-text-fade) + 24px);
-    /* Fade the scrolling content so the background artwork stays crisp beneath it. */
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      black calc(100% - var(--bottom-text-fade)),
-      rgb(0 0 0 / 75%) calc(100% - var(--bottom-text-fade) * 0.55),
-      rgb(0 0 0 / 25%) calc(100% - var(--bottom-text-fade) * 0.2),
-      transparent 100%
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      black calc(100% - var(--bottom-text-fade)),
-      rgb(0 0 0 / 75%) calc(100% - var(--bottom-text-fade) * 0.55),
-      rgb(0 0 0 / 25%) calc(100% - var(--bottom-text-fade) * 0.2),
-      transparent 100%
-    );
+    padding: 12px 19px 17px;
   }
   .motion-row {
     display: grid;
@@ -455,8 +462,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     padding: 3px;
     color: var(--muted);
     opacity: 0;
@@ -598,7 +605,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 2.5rem 1rem 2rem;
+    padding: 0.4rem 1rem 1rem;
     text-align: center;
   }
   .empty-prompt {
@@ -607,9 +614,9 @@
     align-items: center;
     justify-content: center;
     gap: 0.45rem;
-    width: 4rem;
-    height: 3.25rem;
-    margin-bottom: 1.25rem;
+    width: 3rem;
+    height: 2.25rem;
+    margin-bottom: 0.65rem;
     border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
     border-radius: 0.75rem;
     background: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -641,16 +648,16 @@
     text-wrap: balance;
   }
   .empty-state p {
-    margin: 0.75rem 0 1.25rem;
+    margin: 0.35rem 0 0.4rem;
     color: var(--muted);
     font-size: 0.8rem;
     line-height: 1.65;
     text-wrap: pretty;
   }
   .empty-state .integration-link {
-    padding: 0.25rem;
-    color: var(--muted);
-    font-size: 0.7rem;
+    padding: 0.4rem 0.6rem;
+    color: var(--accent-text);
+    font-size: 0.8rem;
     font-weight: 400;
     text-decoration: underline;
     text-underline-offset: 3px;
