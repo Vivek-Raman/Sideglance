@@ -8,19 +8,23 @@
 <div class="skill-target">
   <div><span>{target.name}</span><small>{target.path}</small></div>
   <span class:installed={target.installed}
-    >{target.installed
-      ? target.upToDate
-        ? 'Skill installed'
-        : 'Skill update available'
-      : 'Skill not installed'}</span
+    >{target.updateStatus === 'modified'
+      ? 'Skill differs from latest release'
+      : target.installed
+        ? target.upToDate
+          ? 'Skill installed'
+          : 'Skill update available'
+        : 'Skill not installed'}</span
   ><button onclick={() => onInstall(target.id)} disabled={busy}
     >{busy
       ? 'Installing…'
-      : !target.installed
-        ? 'Install skill'
-        : target.upToDate
-          ? 'Reinstall'
-          : 'Update skill'}</button
+      : target.updateStatus === 'modified'
+        ? 'Review skill'
+        : !target.installed
+          ? 'Install skill'
+          : target.upToDate
+            ? 'Reinstall'
+            : 'Update skill'}</button
   >
 </div>
 

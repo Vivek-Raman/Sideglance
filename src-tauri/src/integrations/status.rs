@@ -52,6 +52,7 @@ pub(crate) fn additional_codex_skill_targets(home: &Path) -> Vec<SkillTarget> {
                 .join("SKILL.md")
                 .is_file(),
             up_to_date: false,
+            update_status: skills::SkillUpdateStatus::NotInstalled,
         })
         .collect()
 }
@@ -119,27 +120,23 @@ pub(crate) fn integration_status(app: &AppHandle) -> Result<SkillInstallation, S
         .ok();
     let targets = skills::targets(app)?
         .into_iter()
-        .map(|(id, name, path)| SkillTarget {
-            id: id.into(),
-            name: name.into(),
-            installed: path.join("SKILL.md").is_file(),
-            up_to_date: path.join("SKILL.md").is_file()
-                && bundled_hash.as_ref().is_some_and(|hash| {
-                    skills::skill_hash(&path)
-                        .map(|installed| installed == *hash)
-                        .unwrap_or(false)
-                }),
-            path: path.display().to_string(),
+        .map(|(id, name, path)| {
+            let update_status = skills::update_status(&path, bundled_hash.as_deref());
+            SkillTarget {
+                id: id.into(),
+                name: name.into(),
+                installed: path.join("SKILL.md").is_file(),
+                up_to_date: update_status == skills::SkillUpdateStatus::Current,
+                update_status,
+                path: path.display().to_string(),
+            }
         })
         .collect::<Vec<_>>();
     let mut additional_targets = additional_codex_skill_targets(&home);
     for target in &mut additional_targets {
-        target.up_to_date = target.installed
-            && bundled_hash.as_ref().is_some_and(|hash| {
-                skills::skill_hash(Path::new(&target.path))
-                    .map(|installed| installed == *hash)
-                    .unwrap_or(false)
-            });
+        target.update_status =
+            skills::update_status(Path::new(&target.path), bundled_hash.as_deref());
+        target.up_to_date = target.update_status == skills::SkillUpdateStatus::Current;
     }
     let mut agents = AGENTS
         .iter()

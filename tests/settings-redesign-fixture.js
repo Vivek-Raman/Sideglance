@@ -39,15 +39,24 @@ const installation = {
   ],
   additionalAgents: [],
 };
+if (new URLSearchParams(location.search).has('modified')) {
+  installation.targets[0].installed = true;
+  installation.targets[0].updateStatus = 'modified';
+  installation.agents[0].mcpRegistered = true;
+  installation.agents[0].configurationValid = true;
+}
 window.calls = [];
+window.installArgs = [];
 mockIPC((name, args) => {
   window.calls.push(name);
   if (name === 'get_settings') return settings;
   if (name === 'get_skill_installation') return structuredClone(installation);
   if (name === 'install_skill_for_target') {
+    window.installArgs.push(args);
     const target = installation.targets.find((item) => item.id === args.target);
     target.installed = true;
     target.upToDate = true;
+    target.updateStatus = 'current';
     return structuredClone(installation);
   }
   if (name === 'install_mcp_for_harness') {

@@ -20,11 +20,13 @@ tauri = { version = "2.12", features = [] }
 notify = "8"
 chrono = { version = "0.4", features = ["clock"] }
 rmcp = { version = "3.5.1", features = ["transport-io"] }
-tokio = { version = "1", features = ["rt", "io-std", "process", "time", "io-util"] }
+tokio = { version = "1", features = ["rt", "io-std", "process", "time", "io-util", "sync"] }
 tempfile = "3"
 schemars = "1"
 uuid = { version = "1", features = ["v4", "v5"] }
 sha2 = "0.10"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 toml_edit = "0.22"
 fs2 = "0.4"
 

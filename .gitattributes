@@ -1,0 +1,2 @@
+# Released skill hashes require exact bytes on every platform.
+src-tauri/resources/skills/** -text

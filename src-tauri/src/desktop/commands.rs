@@ -320,11 +320,13 @@ pub(crate) fn restart_app(app: AppHandle) {
 
 #[tauri::command]
 pub(crate) async fn get_skill_installation(app: AppHandle) -> Result<SkillInstallation, String> {
+    skills::load_server_skill_hash().await;
     blocking(move || integration_status(&app)).await
 }
 
 #[tauri::command]
 pub(crate) async fn install_skill(app: AppHandle) -> Result<SkillInstallation, String> {
+    skills::load_server_skill_hash().await;
     blocking(move || {
         let source = skills::bundled_source(&app)?;
         let mut installed = std::collections::HashSet::new();
@@ -332,7 +334,12 @@ pub(crate) async fn install_skill(app: AppHandle) -> Result<SkillInstallation, S
             if !installed.insert(skills::resolved_destination(&destination)?) {
                 continue;
             }
-            skills::install_at(&source, &destination, &skills::installation_storage(&app)?)?;
+            skills::install_at(
+                &source,
+                &destination,
+                &skills::installation_storage(&app)?,
+                skills::InstallMode::Safe,
+            )?;
         }
         integration_status(&app)
     })
@@ -342,12 +349,23 @@ pub(crate) async fn install_skill(app: AppHandle) -> Result<SkillInstallation, S
 #[tauri::command]
 pub(crate) async fn install_skill_for_target(
     target: String,
+    replace_modified: Option<bool>,
     app: AppHandle,
 ) -> Result<SkillInstallation, String> {
+    skills::load_server_skill_hash().await;
     blocking(move || {
         let source = skills::bundled_source(&app)?;
         let destination = skills::target(&app, &target)?;
-        skills::install_at(&source, &destination, &skills::installation_storage(&app)?)?;
+        skills::install_at(
+            &source,
+            &destination,
+            &skills::installation_storage(&app)?,
+            if replace_modified.unwrap_or(false) {
+                skills::InstallMode::ReplaceModified
+            } else {
+                skills::InstallMode::Safe
+            },
+        )?;
         integration_status(&app)
     })
     .await

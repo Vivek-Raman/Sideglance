@@ -1,7 +1,7 @@
 import { test, expect } from 'playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/tests/settings-redesign.html', (route) =>
+  await page.route('**/tests/settings-redesign.html*', (route) =>
     route.fulfill({
       contentType: 'text/html',
       body: '<!doctype html><html><body><script type="module" src="/tests/settings-redesign-fixture.js"></script></body></html>',
@@ -55,4 +55,22 @@ test('failed connection keeps a fix action available', async ({ page }) => {
   await row.getByRole('button', { name: 'Set up' }).click();
   await expect(row.getByRole('button', { name: 'Fix setup' })).toBeVisible();
   await expect(row.getByText(/Connection needs attention/)).toBeVisible();
+});
+
+test('modified skills require explicit replacement', async ({ page }) => {
+  await page.goto('/tests/settings-redesign.html?modified=1#/settings?section=agents');
+  const row = page.locator('.agent-row').filter({ hasText: 'Codex' });
+  await row.getByRole('button', { name: 'Review skill' }).click();
+  await expect(page.getByText(/Replacing it will discard/)).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as unknown as { installArgs: unknown[] }).installArgs),
+  ).toEqual([]);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Replace modified skill' })).toHaveCount(0);
+  await row.getByRole('button', { name: 'Review skill' }).click();
+  await page.getByRole('button', { name: 'Replace modified skill' }).click();
+  await expect(row.getByText('Configured', { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as unknown as { installArgs: unknown[] }).installArgs),
+  ).toEqual([{ target: 'codex', replaceModified: true }]);
 });

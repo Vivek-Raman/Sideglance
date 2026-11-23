@@ -11,6 +11,7 @@
   let errors: Record<string, string> = {};
   let disposed = false;
   let loadError = '';
+  let replaceTarget = '';
   let failedTests: Record<string, boolean> = {};
   const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
   function targetFor(id: string) {
@@ -27,19 +28,35 @@
     if (failed || agent?.error || (agent?.mcpRegistered && !agent.configurationValid))
       return 'Fix setup';
     if ((target && !target.installed) || (agent && !agent.mcpRegistered)) return 'Set up';
+    if (target?.updateStatus === 'modified') return 'Review skill';
     if (target && !target.upToDate) return 'Update';
     return '';
   }
-  async function setup(id: string, force: 'skill' | 'mcp' | null = null) {
+  async function setup(id: string, force: 'skill' | 'mcp' | null = null, replaceModified = false) {
     if (busy) return;
+    if (
+      targetFor(id)?.updateStatus === 'modified' &&
+      force !== 'mcp' &&
+      !replaceModified &&
+      (force === 'skill' ||
+        action(targetFor(id), agentFor(id), !!failedTests[id]) === 'Review skill')
+    ) {
+      replaceTarget = id;
+      return;
+    }
+    replaceTarget = '';
     busy = id;
     errors = { ...errors, [id]: '' };
     results = { ...results, [id]: '' };
     try {
       const target = targetFor(id);
-      if (target && (force === 'skill' || !target.installed || !target.upToDate)) {
+      if (
+        target &&
+        (replaceModified || target.updateStatus !== 'modified') &&
+        (force === 'skill' || !target.installed || !target.upToDate)
+      ) {
         progress = 'Installing skill…';
-        const value = await command('install_skill_for_target', { target: id });
+        const value = await command('install_skill_for_target', { target: id, replaceModified });
         if (disposed) return;
         skill = value;
       }
@@ -129,11 +146,16 @@
       }
     }
   }
-  async function installExtra(id: string) {
+  async function installExtra(id: string, replaceModified = false) {
     if (busy) return;
+    if (targetFor(id)?.updateStatus === 'modified' && !replaceModified) {
+      replaceTarget = id;
+      return;
+    }
+    replaceTarget = '';
     busy = id;
     try {
-      const value = await command('install_skill_for_target', { target: id });
+      const value = await command('install_skill_for_target', { target: id, replaceModified });
       if (!disposed) skill = value;
     } catch (error) {
       if (!disposed) onError(error);
@@ -191,11 +213,13 @@
             {!target || !agent
               ? 'Additional setup required'
               : mainAction
-                ? mainAction === 'Update'
-                  ? 'Skill update available'
-                  : mainAction === 'Fix setup'
-                    ? 'Setup needs attention'
-                    : 'Setup needed'
+                ? mainAction === 'Review skill'
+                  ? 'Skill differs from latest release'
+                  : mainAction === 'Update'
+                    ? 'Skill update available'
+                    : mainAction === 'Fix setup'
+                      ? 'Setup needs attention'
+                      : 'Setup needed'
                 : 'Configured'}
           </p>
         </div>
@@ -209,11 +233,13 @@
       <details>
         <summary>Details</summary>
         {#if target}<p>
-            Skill: {target.installed
-              ? target.upToDate
-                ? 'Installed'
-                : 'Update available'
-              : 'Not installed'}<br /><small>{target.path}</small>
+            Skill: {target.updateStatus === 'modified'
+              ? 'Differs from latest release. Automatic updates are paused.'
+              : target.installed
+                ? target.upToDate
+                  ? 'Installed'
+                  : 'Update available'
+                : 'Not installed'}<br /><small>{target.path}</small>
           </p>
           {#if target.installed}<button disabled={!!busy} onclick={() => void setup(id, 'skill')}
               >Reinstall skill</button
@@ -242,6 +268,20 @@
     Set up the available components for each agent. Restart existing agent sessions after changes. A
     connection test does not confirm that an agent has reported status.
   </p>
+  {#if replaceTarget}
+    <div role="alert">
+      <p>This skill differs from the published skill. Replacing it will discard any local edits.</p>
+      <p><small>{targetFor(replaceTarget)?.path}</small></p>
+      <button
+        disabled={!!busy}
+        onclick={() =>
+          replaceTarget === 'agents'
+            ? void installExtra(replaceTarget, true)
+            : void setup(replaceTarget, 'skill', true)}>Replace modified skill</button
+      >
+      <button disabled={!!busy} onclick={() => (replaceTarget = '')}>Cancel</button>
+    </div>
+  {/if}
   {#if skill}
     {@render rows(ids, skill)}
     {#if extraIds.length}<details class="additional">
@@ -256,7 +296,7 @@
         <SkillTargetRow
           target={skill.targets.find((target) => target.id === 'agents')!}
           busy={!!busy}
-          onInstall={installExtra}
+          onInstall={(id) => void installExtra(id)}
         />
         <p>Restart existing agent sessions after installing or updating the skill.</p>
       </details>

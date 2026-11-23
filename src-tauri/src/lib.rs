@@ -62,6 +62,17 @@ pub fn run() {
             status::snapshot::update(app.handle(), &state);
             status::watcher::start(app.handle().clone(), state, settings);
             window.show()?;
+            if !cfg!(debug_assertions) {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    integrations::skills::load_server_skill_hash().await;
+                    tauri::async_runtime::spawn_blocking(move || {
+                        if let Err(error) = integrations::skills::update_allowed_skills(&handle) {
+                            eprintln!("Unable to update skills: {error}");
+                        }
+                    });
+                });
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

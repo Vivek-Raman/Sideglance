@@ -56,6 +56,7 @@ export type SkillTarget = {
   path: string;
   installed: boolean;
   upToDate: boolean;
+  updateStatus: 'notInstalled' | 'current' | 'updateAvailable' | 'modified';
 };
 
 export type SkillInstallation = {
