@@ -327,8 +327,12 @@ pub(crate) async fn get_skill_installation(app: AppHandle) -> Result<SkillInstal
 pub(crate) async fn install_skill(app: AppHandle) -> Result<SkillInstallation, String> {
     blocking(move || {
         let source = skills::bundled_source(&app)?;
+        let mut installed = std::collections::HashSet::new();
         for (_, _, destination) in skills::targets(&app)? {
-            skills::install_at(&source, &destination)?;
+            if !installed.insert(skills::resolved_destination(&destination)?) {
+                continue;
+            }
+            skills::install_at(&source, &destination, &skills::installation_storage(&app)?)?;
         }
         integration_status(&app)
     })
@@ -343,7 +347,7 @@ pub(crate) async fn install_skill_for_target(
     blocking(move || {
         let source = skills::bundled_source(&app)?;
         let destination = skills::target(&app, &target)?;
-        skills::install_at(&source, &destination)?;
+        skills::install_at(&source, &destination, &skills::installation_storage(&app)?)?;
         integration_status(&app)
     })
     .await
