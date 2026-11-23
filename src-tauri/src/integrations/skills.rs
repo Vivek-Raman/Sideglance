@@ -382,7 +382,7 @@ fn install_with_rename(
     if skill_hash(source)? != hash {
         return Err("Skill source changed during installation; retry the operation".into());
     }
-    if existing && skill_hash(&destination)? == hash {
+    if existing && skill_hash(&destination).is_ok_and(|installed| installed == hash) {
         retire_legacy_skill(&destination, &record)?;
         finish_replacement(&record)?;
         return Ok(false);
@@ -999,6 +999,56 @@ mod tests {
         ] {
             assert_eq!(parse_server_hash(&manifest), None);
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn nested_destination_symlinks_require_explicit_replacement() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        let destination = dir.path().join("sideglance");
+        let storage = dir.path().join("recovery");
+        let external = dir.path().join("external");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("SKILL.md"), "new").unwrap();
+        fs::create_dir(&destination).unwrap();
+        fs::write(destination.join("SKILL.md"), "old").unwrap();
+        fs::create_dir(&external).unwrap();
+        fs::write(external.join("notes.md"), "keep").unwrap();
+        symlink(&external, destination.join("custom-link")).unwrap();
+
+        for mode in [InstallMode::Safe, InstallMode::Automatic] {
+            assert!(install_at(&source, &destination, &storage, mode)
+                .unwrap_err()
+                .contains("Use Replace modified skill"));
+            assert_eq!(
+                fs::read_to_string(destination.join("SKILL.md")).unwrap(),
+                "old"
+            );
+            assert!(fs::symlink_metadata(destination.join("custom-link"))
+                .unwrap()
+                .file_type()
+                .is_symlink());
+        }
+
+        assert!(install_at(
+            &source,
+            &destination,
+            &storage,
+            InstallMode::ReplaceModified
+        )
+        .unwrap());
+        assert_eq!(
+            fs::read_to_string(destination.join("SKILL.md")).unwrap(),
+            "new"
+        );
+        assert!(!destination.join("custom-link").exists());
+        assert_eq!(
+            fs::read_to_string(external.join("notes.md")).unwrap(),
+            "keep"
+        );
+        assert!(!record_in(&storage).join("rollback").exists());
     }
 
     #[cfg(unix)]
