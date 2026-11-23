@@ -48,7 +48,94 @@ main {
   isolation: isolate;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
+  background:
+    radial-gradient(
+      ellipse 105% 65% at 58% -18%,
+      color-mix(in srgb, var(--accent) 13%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 92% 48% at 43% 118%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 68%
+    ),
+    var(--bg);
+}
+main::before,
+main::after {
+  position: absolute;
+  z-index: 0;
+  width: 128%;
+  content: '';
+  pointer-events: none;
+}
+main::before {
+  content: none;
+}
+main::after {
+  bottom: 0;
+  left: -28%;
+  height: max(150px, 68%);
+  opacity: 0.8;
+  background:
+    radial-gradient(
+      ellipse 64% 38% at 18% 118%,
+      color-mix(in srgb, var(--accent) 17%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 56% 34% at 88% 112%,
+      color-mix(in srgb, var(--accent) 11%, transparent),
+      transparent 72%
+    );
+}
+@media (max-width: 700px), (max-height: 600px) {
+  main::before {
+    top: 0;
+    left: -14%;
+    height: max(180px, 68%);
+    content: '';
+    background:
+      radial-gradient(
+        ellipse 96% 62% at 55% -24%,
+        transparent 54.2%,
+        color-mix(in srgb, var(--accent) 30%, transparent) 55%,
+        transparent 56%
+      ),
+      radial-gradient(
+        ellipse 82% 52% at 46% -18%,
+        transparent 66.2%,
+        color-mix(in srgb, var(--accent) 24%, transparent) 67%,
+        transparent 68%
+      ),
+      radial-gradient(
+        ellipse 68% 42% at 62% -14%,
+        transparent 78.2%,
+        color-mix(in srgb, var(--accent) 18%, transparent) 79%,
+        transparent 80%
+      );
+  }
+}
+@media (max-width: 440px), (max-height: 360px) {
+  main::before {
+    height: max(150px, 62%);
+    background:
+      radial-gradient(
+        ellipse 94% 61% at 55% -20%,
+        transparent 59%,
+        color-mix(in srgb, var(--accent) 31%, transparent) 60%,
+        transparent 61.5%
+      ),
+      radial-gradient(
+        ellipse 70% 44% at 48% -12%,
+        transparent 76%,
+        color-mix(in srgb, var(--accent) 22%, transparent) 77%,
+        transparent 78.5%
+      );
+  }
+  main::after {
+    height: max(120px, 58%);
+  }
 }
 .app-chrome {
   position: relative;

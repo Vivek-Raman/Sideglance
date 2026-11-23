@@ -148,8 +148,8 @@ test('compact viewer keeps content readable and setup opens agent settings', asy
     ),
   ).toEqual({ section: 'agents' });
   await page.evaluate(() => window.fixture.set('current', window.fixture.entries()));
-  await expect(page.locator('.line-art, .bottom-line-art')).toHaveCount(0);
-  await expect(page.locator('.document')).toHaveCSS('mask-image', 'none');
+  await expect(page.locator('.line-art, .bottom-line-art')).toHaveCount(2);
+  await expect(page.locator('.document')).toHaveCSS('mask-image', /linear-gradient/);
   expect((await page.locator('.status-point').first().boundingBox())!.width).toBeGreaterThan(250);
   await page.setViewportSize({ width: 280, height: 220 });
   await page.evaluate(() => {

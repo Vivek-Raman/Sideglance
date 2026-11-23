@@ -280,7 +280,7 @@
 </script>
 
 <main>
-  {#if !rows.length}<ViewerArtwork />{/if}
+  <ViewerArtwork />
   <div class="app-chrome" data-tauri-drag-region aria-hidden="true"></div>
   <ViewerToolbar
     {settings}
@@ -426,8 +426,25 @@
     --ease-gentle-out: cubic-bezier(0.22, 1, 0.36, 1);
   }
   .document {
+    --bottom-text-fade: clamp(64px, 20vh, 124px);
     overflow-anchor: none;
-    padding: 12px 19px 17px;
+    padding: 17px 19px;
+    padding-bottom: calc(var(--bottom-text-fade) + 24px);
+    /* Fade the scrolling content so the background artwork stays crisp beneath it. */
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      black calc(100% - var(--bottom-text-fade)),
+      rgb(0 0 0 / 75%) calc(100% - var(--bottom-text-fade) * 0.55),
+      rgb(0 0 0 / 25%) calc(100% - var(--bottom-text-fade) * 0.2),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      black calc(100% - var(--bottom-text-fade)),
+      rgb(0 0 0 / 75%) calc(100% - var(--bottom-text-fade) * 0.55),
+      rgb(0 0 0 / 25%) calc(100% - var(--bottom-text-fade) * 0.2),
+      transparent 100%
+    );
   }
   .motion-row {
     display: grid;
@@ -605,7 +622,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0.4rem 1rem 1rem;
+    padding: 2.5rem 1rem 2rem;
     text-align: center;
   }
   .empty-prompt {
@@ -614,9 +631,9 @@
     align-items: center;
     justify-content: center;
     gap: 0.45rem;
-    width: 3rem;
-    height: 2.25rem;
-    margin-bottom: 0.65rem;
+    width: 4rem;
+    height: 3.25rem;
+    margin-bottom: 1.25rem;
     border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
     border-radius: 0.75rem;
     background: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -648,16 +665,16 @@
     text-wrap: balance;
   }
   .empty-state p {
-    margin: 0.35rem 0 0.4rem;
+    margin: 0.75rem 0 1.25rem;
     color: var(--muted);
     font-size: 0.8rem;
     line-height: 1.65;
     text-wrap: pretty;
   }
   .empty-state .integration-link {
-    padding: 0.4rem 0.6rem;
-    color: var(--accent-text);
-    font-size: 0.8rem;
+    padding: 0.25rem;
+    color: var(--muted);
+    font-size: 0.7rem;
     font-weight: 400;
     text-decoration: underline;
     text-underline-offset: 3px;
