@@ -59,8 +59,11 @@ export function viewerRows(
       rows.push({
         key: JSON.stringify(['branch', grouping, group, branch]),
         kind: 'branch',
-        branch:
-          grouping === 'project-directory' && repository ? `${repository} · ${branch}` : branch,
+        branch: branch.trim()
+          ? grouping === 'project-directory' && repository
+            ? `${repository} · ${branch}`
+            : branch
+          : '',
       });
       const points = projectEntries
         .filter((entry) => entry.branch === branch)
@@ -87,7 +90,8 @@ export function viewerRows(
   });
 }
 
-// Collapse affects presentation only. Keep all rows and source entries intact.
+// Keep branch boundaries even without a subtitle so collapse state resets for their points.
+// Visibility affects presentation only. Keep all rows and source entries intact.
 export function collapsedRowKeys(rows: ViewerRow[], collapsed: ReadonlySet<string>) {
   const hidden = new Set<string>();
   let groupCollapsed = false;
@@ -97,8 +101,8 @@ export function collapsedRowKeys(rows: ViewerRow[], collapsed: ReadonlySet<strin
       groupCollapsed = collapsed.has(row.key);
       branchCollapsed = false;
     } else if (row.kind === 'branch') {
-      branchCollapsed = collapsed.has(row.key);
-      if (groupCollapsed) hidden.add(row.key);
+      branchCollapsed = !!row.branch && collapsed.has(row.key);
+      if (groupCollapsed || !row.branch) hidden.add(row.key);
     } else if (groupCollapsed || branchCollapsed) {
       hidden.add(row.key);
     }

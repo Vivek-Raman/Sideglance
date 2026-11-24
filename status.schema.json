@@ -63,7 +63,9 @@
           "description": "Real session ID. Null is supported only for reading legacy records; MCP writes require a non-empty string."
         },
         "branch": {
-          "$ref": "#/$defs/line"
+          "type": "string",
+          "pattern": "^[^\\r\\n]*$",
+          "description": "Git branch name, or an empty string when unavailable."
         },
         "points": {
           "type": "array",

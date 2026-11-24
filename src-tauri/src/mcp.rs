@@ -179,6 +179,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn resolved_blank_branch_can_be_saved_and_read() {
+        let temp = tempfile::tempdir().unwrap();
+        let project = project::resolve(temp.path().to_str().unwrap()).unwrap();
+        assert!(project.branch.is_empty());
+        let store = StatusStore::new(temp.path().join("status.json"));
+        let point: AgentPoint =
+            serde_json::from_value(serde_json::json!({"text": "working"})).unwrap();
+        store
+            .upsert_with_resolved_repository_result(
+                project.folder_name.clone(),
+                "session".into(),
+                project.branch,
+                vec![point.into()],
+                project.repository,
+            )
+            .unwrap();
+        let entries = store.read_project(&project.folder_name, "session").unwrap();
+        assert_eq!(entries[0].branch, "");
+        assert_eq!(entries[0].points[0].text, "working");
+        for branch in ["main\nother", "main\rother"] {
+            assert!(matches!(
+                store.upsert(
+                    project.folder_name.clone(),
+                    "session".into(),
+                    branch.into(),
+                    entries[0].points.clone(),
+                ),
+                Err(StatusError::InvalidInput(_))
+            ));
+        }
+        let mut document = store.read().unwrap();
+        document.entries[0].branch = "main\nother".into();
+        assert!(crate::status::domain::validate(&document).is_err());
+    }
+
+    #[test]
     fn saved_points_support_updates_without_another_read() {
         let temp = tempfile::tempdir().unwrap();
         let store = StatusStore::new(temp.path().join("status.json"));

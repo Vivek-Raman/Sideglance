@@ -217,3 +217,26 @@ test('collapse hides descendants only and preserves subgroup choices across upda
   assert.equal(updated.at(-1)!.points.length, 1);
   assert.equal(collapsedRowKeys(nextRows, new Set()).size, 0);
 });
+
+test('blank branches hide subtitles without hiding points or inheriting collapse state', () => {
+  for (const blank of ['', '   ']) {
+    for (const grouping of ['project-directory', 'repository'] as const) {
+      const input = [entry('named', 'main', [null]), entry('blank', blank, [null])].map((item) => ({
+        ...item,
+        repository: 'owner/repo',
+      }));
+      const projects = projectNames(input, 'project-directory-asc', grouping);
+      const rows = viewerRows(input, projects, 'submitted-at-desc', grouping);
+      const branches = rows.filter((row) => row.kind === 'branch');
+      assert.equal(branches[1].branch, '');
+      const hidden = collapsedRowKeys(rows, new Set(branches.map((row) => row.key)));
+      assert.equal(hidden.has(branches[0].key), false);
+      assert.equal(hidden.has(branches[1].key), true);
+      const points = rows.filter((row) => row.kind === 'point');
+      assert.equal(hidden.has(points[0].key), true);
+      assert.equal(hidden.has(points[1].key), false);
+      const project = rows.find((row) => row.kind === 'project')!;
+      assert.equal(collapsedRowKeys(rows, new Set([project.key])).size, rows.length - 1);
+    }
+  }
+});

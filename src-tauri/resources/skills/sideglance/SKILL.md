@@ -12,7 +12,7 @@ Use your absolute working directory and actual harness session/thread ID for bot
 Read with `read_status` at session start or after losing the saved points from context. Otherwise reuse the points returned by the last successful write.
 
 Write with `write_status`:
-- `working_directory`: your absolute working directory in the project. Subdirectories resolve to the checkout root; outside Git, the directory name is used with no repository and branch `no branch`.
+- `working_directory`: your absolute working directory in the project. Subdirectories resolve to the checkout root; outside Git, the directory name is used with no repository and an empty branch.
 - `session_id`: the same actual harness session/thread ID used for reads.
 - `points`: the complete revised list. Each point has `text`, optional `done` and HTTP(S) `link`, and an `id` for existing points. Preserve returned IDs; omit IDs for new points. Writes return saved points with assigned IDs.
 

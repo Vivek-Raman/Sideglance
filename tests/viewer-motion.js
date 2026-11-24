@@ -380,6 +380,24 @@ window.motionResults = (async () => {
   assertHeadersVisible();
   assert(document.querySelector('.motion-row p'), 'subtitle did not return');
   results.push({ name: 'header titles stay visible across settings and snapshot animations' });
+  const previousEntries = entries;
+  for (const grouping of ['project-directory', 'repository']) {
+    settings = { ...settings, statusGrouping: grouping };
+    emit('settings-update', settings);
+    await push([{ ...entry('Blank branch', 'Blank branch', ''), repository: 'owner/repo' }]);
+    await pause(850);
+    const subtitle = document.querySelector('.group-heading:not(.project-heading)');
+    const subtitleRow = subtitle?.closest('.motion-row');
+    assert(subtitleRow?.getAttribute('aria-hidden') === 'true', 'blank subtitle is accessible');
+    assert(subtitleRow.getBoundingClientRect().height < 1, 'blank subtitle reserves space');
+    assert(
+      find('Blank branch point 0')?.getBoundingClientRect().height > 0,
+      'blank branch hid points',
+    );
+  }
+  await push(previousEntries);
+  await pause(850);
+  results.push({ name: 'blank branch subtitles are hidden in both grouping modes' });
   const matchMedia = window.matchMedia.bind(window);
   window.matchMedia = (query) =>
     query === '(prefers-reduced-motion: reduce)' ? { matches: true } : matchMedia(query);

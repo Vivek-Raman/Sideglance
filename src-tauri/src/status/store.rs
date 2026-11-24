@@ -535,10 +535,10 @@ impl StatusStore {
         let _lock = self.lock()?;
         if !domain::single_line(&folder)
             || !domain::single_line(&session)
-            || !domain::single_line(&branch)
+            || branch.contains(['\n', '\r'])
         {
             return Err(StatusError::InvalidInput(
-                "Folder, session ID, and branch must be non-empty single lines".into(),
+                "Folder and session ID must be non-empty single lines; branch must be a single line".into(),
             ));
         }
         let mut document = self.read_unlocked()?;

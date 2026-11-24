@@ -51,7 +51,7 @@ pub(super) fn resolve(working_directory: &str) -> Result<Project, String> {
         let root = output_text(root)?;
         let branch = git(&directory, &["symbolic-ref", "--quiet", "--short", "HEAD"])?;
         let branch = if branch.status.code() == Some(1) {
-            "detached HEAD".to_owned()
+            String::new()
         } else {
             output_text(branch)?
         };
@@ -63,7 +63,7 @@ pub(super) fn resolve(working_directory: &str) -> Result<Project, String> {
         };
         (std::path::PathBuf::from(root), branch, repository)
     } else if String::from_utf8_lossy(&root.stderr).contains("not a git repository") {
-        (directory, "no branch".into(), None)
+        (directory, String::new(), None)
     } else {
         return Err(
             "Cannot discover Git checkout; check repository access and configuration".into(),
@@ -190,7 +190,7 @@ mod tests {
         run(&root, &["checkout", "-b", "feature"]);
         assert_eq!(resolve_at(&root).branch, "feature");
         run(&root, &["checkout", "--detach"]);
-        assert_eq!(resolve_at(&root).branch, "detached HEAD");
+        assert_eq!(resolve_at(&root).branch, "");
         let worktree = temp.path().join("worktree");
         run(
             &root,
@@ -224,7 +224,7 @@ mod tests {
         // Temp directories must be outside a Git checkout for this fallback.
         let project = resolve(directory.to_str().unwrap()).unwrap();
         assert_eq!(project.folder_name, "outside");
-        assert_eq!(project.branch, "no branch");
+        assert_eq!(project.branch, "");
         assert_eq!(project.repository, None);
     }
 }

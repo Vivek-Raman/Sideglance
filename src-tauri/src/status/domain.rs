@@ -59,11 +59,11 @@ pub fn validate(document: &Document) -> Result<(), String> {
             .as_ref()
             .is_some_and(|repo| !single_line(repo))
             || !single_line(&entry.folder_name)
-            || !single_line(&entry.branch)
+            || entry.branch.contains(['\n', '\r'])
             || entry.session_id.as_ref().is_some_and(|id| !single_line(id))
             || entry.points.is_empty()
         {
-            return Err("Folder, branch, and supplied session ID must be non-empty single lines; points are required".into());
+            return Err("Folder and supplied session ID must be non-empty single lines; branch must be a single line; points are required".into());
         }
         if let Some(id) = &entry.session_id {
             if !keys.insert((&entry.folder_name, id)) {
