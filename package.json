@@ -1,6 +1,6 @@
 {
   "name": "sideglance",
-  "version": "2.8.1",
+  "version": "2.8.2",
   "description": "A desktop status board for coding agents",
   "license": "GPL-3.0-only",
   "private": true,
