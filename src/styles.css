@@ -91,10 +91,6 @@ main::after {
 }
 @media (max-width: 700px), (max-height: 600px) {
   main::before {
-    top: 0;
-    left: -14%;
-    height: max(180px, 68%);
-    content: '';
     background:
       radial-gradient(
         ellipse 96% 62% at 55% -24%,
